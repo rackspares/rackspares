@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import api from '../api';
-import InventoryForm from '../components/InventoryForm';
-import StatusBadge from '../components/StatusBadge';
+import api from '../api.jsx';
+import InventoryForm from '../components/InventoryForm.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 
 const CATEGORIES = [
   'Server', 'Network', 'Storage', 'Power',

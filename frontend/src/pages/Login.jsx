@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../api';
-import { useAuth } from '../App';
+import api from '../api.jsx';
+import { useAuth } from '../App.jsx';
 
 export default function Login() {
   const [username, setUsername] = useState('');

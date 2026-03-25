@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import api from './api';
-import Navbar from './components/Navbar';
-import Inventory from './pages/Inventory';
-import Login from './pages/Login';
+import api from './api.jsx';
+import Navbar from './components/Navbar.jsx';
+import Inventory from './pages/Inventory.jsx';
+import Login from './pages/Login.jsx';
 
 export const AuthContext = createContext(null);
 

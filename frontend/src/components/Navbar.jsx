@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '../App';
+import { useAuth } from '../App.jsx';
 
 export default function Navbar() {
   const { user, setUser } = useAuth();
