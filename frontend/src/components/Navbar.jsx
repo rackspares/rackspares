@@ -7,7 +7,9 @@ export default function Navbar() {
   const { user, setUser } = useAuth();
   const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState(null);
+  const [navOpen, setNavOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const navRef = useRef(null);
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -16,12 +18,10 @@ export default function Navbar() {
       .catch(() => {});
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
+      if (navRef.current && !navRef.current.contains(e.target)) setNavOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -38,14 +38,16 @@ export default function Navbar() {
     setMenuOpen(false);
   };
 
+  const handleNavLink = () => setNavOpen(false);
+
   const role = user?.role;
   const isAdmin = role === 'admin';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
-
   const initial = user?.username?.[0]?.toUpperCase() || '?';
 
   return (
     <nav className="navbar">
+      {/* Brand */}
       <div className="navbar-brand">
         <div className="navbar-brand-icon">
           {logoUrl
@@ -57,82 +59,107 @@ export default function Navbar() {
         <span className="version-tag">v0.4.1</span>
       </div>
 
-      <div className="navbar-nav">
-        <NavLink
-          to="/"
-          end
-          className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
+      {/* Navigation dropdown */}
+      <div className="nav-dropdown-wrapper" ref={navRef}>
+        <button
+          className="nav-dropdown-trigger"
+          onClick={() => setNavOpen((o) => !o)}
+          aria-expanded={navOpen}
+          aria-haspopup="true"
         >
-          Inventory
-        </NavLink>
-        {isManagerOrAdmin && (
-          <NavLink
-            to="/reorder"
-            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-          >
-            Reorder
-          </NavLink>
-        )}
-        <NavLink
-          to="/boms"
-          className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-        >
-          BOMs
-        </NavLink>
-        <NavLink
-          to="/netbox/browse"
-          className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-        >
-          Netbox
-        </NavLink>
-        {isManagerOrAdmin && (
-          <NavLink
-            to="/netbox/clone"
-            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-          >
-            Clone&nbsp;Rack
-          </NavLink>
-        )}
-        <NavLink
-          to="/optics"
-          className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-        >
-          Optics
-        </NavLink>
-        {isManagerOrAdmin && (
-          <NavLink
-            to="/audit"
-            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-          >
-            Audit Log
-          </NavLink>
-        )}
-        {isAdmin && (
-          <NavLink
-            to="/users"
-            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-          >
-            Users
-          </NavLink>
-        )}
-        {isAdmin && (
-          <NavLink
-            to="/categories"
-            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-          >
-            Categories
-          </NavLink>
-        )}
-        {isAdmin && (
-          <NavLink
-            to="/netbox"
-            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
-          >
-            NB&nbsp;Settings
-          </NavLink>
+          Navigation
+          <span className="nav-dropdown-caret" aria-hidden="true">&#9660;</span>
+        </button>
+
+        {navOpen && (
+          <div className="nav-dropdown" role="menu">
+            <NavLink
+              to="/"
+              end
+              className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+              onClick={handleNavLink}
+            >
+              Inventory
+            </NavLink>
+            {isManagerOrAdmin && (
+              <NavLink
+                to="/reorder"
+                className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                onClick={handleNavLink}
+              >
+                Reorder
+              </NavLink>
+            )}
+            <NavLink
+              to="/boms"
+              className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+              onClick={handleNavLink}
+            >
+              BOMs
+            </NavLink>
+            <NavLink
+              to="/netbox/browse"
+              className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+              onClick={handleNavLink}
+            >
+              Netbox
+            </NavLink>
+            {isManagerOrAdmin && (
+              <NavLink
+                to="/netbox/clone"
+                className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                onClick={handleNavLink}
+              >
+                Clone Rack
+              </NavLink>
+            )}
+            <NavLink
+              to="/optics"
+              className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+              onClick={handleNavLink}
+            >
+              Optics
+            </NavLink>
+            {isManagerOrAdmin && (
+              <NavLink
+                to="/audit"
+                className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                onClick={handleNavLink}
+              >
+                Audit Log
+              </NavLink>
+            )}
+            {isAdmin && (
+              <>
+                <div className="nav-dropdown-divider" />
+                <NavLink
+                  to="/users"
+                  className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                  onClick={handleNavLink}
+                >
+                  Users
+                </NavLink>
+                <NavLink
+                  to="/categories"
+                  className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                  onClick={handleNavLink}
+                >
+                  Categories
+                </NavLink>
+                <NavLink
+                  to="/netbox"
+                  className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                  onClick={handleNavLink}
+                >
+                  NB Settings
+                </NavLink>
+              </>
+            )}
+          </div>
         )}
       </div>
 
+      {/* User menu */}
       <div className="navbar-right" ref={menuRef}>
         <button
           className="user-menu-trigger"
