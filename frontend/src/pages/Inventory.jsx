@@ -4,6 +4,13 @@ import { useAuth } from '../App.jsx';
 import InventoryForm from '../components/InventoryForm.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
+function fmt(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+  });
+}
+
 function daysAgo(lastVerified) {
   if (!lastVerified) return Infinity;
   return (Date.now() - new Date(lastVerified).getTime()) / 86400000;
