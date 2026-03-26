@@ -154,13 +154,32 @@ export default function BarcodeScanner({ onScan, onTextFound, onError }) {
       const { recognize } = await import('tesseract.js');
       const { data } = await recognize(file, 'eng', { logger: () => {} });
 
-      // Collect meaningful lines: length ≥ 3, not pure whitespace/punctuation
       const lines = (data.lines || [])
-        .map((l) => l.text.trim())
-        .filter((t) => t.length >= 3 && /[a-zA-Z0-9]/.test(t));
+        .filter((l) => {
+          const t = l.text.trim();
+          if (l.confidence < 60) return false;               // low-confidence read
+          if (t.length < 4) return false;                    // too short
+          const alnum = t.replace(/[^a-zA-Z0-9]/g, '');
+          if (alnum.length < 3) return false;                // mostly symbols/spaces
+          const garbage = t.replace(/[a-zA-Z0-9 \-./()]/g, '').length;
+          if (garbage / t.length > 0.3) return false;       // >30% weird chars = noise
+          return true;
+        })
+        .sort((a, b) => b.confidence - a.confidence)        // best confidence first
+        .slice(0, 10)                                        // max 10 lines
+        .map((l) => l.text.trim());
 
-      if (lines.length > 0) {
-        onTextFound?.(lines);
+      // Deduplicate near-identical lines
+      const seen = new Set();
+      const unique = lines.filter((t) => {
+        const key = t.toLowerCase().replace(/\s+/g, '');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      if (unique.length > 0) {
+        onTextFound?.(unique);
       } else if (!barcodeFound) {
         setUploadError('No barcode or readable text found. Try a clearer, closer shot.');
       }
