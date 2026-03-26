@@ -4,32 +4,45 @@ import { useAuth } from '../App.jsx';
 import InventoryForm from '../components/InventoryForm.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
-function fmt(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric', month: 'short', day: 'numeric',
-  });
+function daysAgo(lastVerified) {
+  if (!lastVerified) return Infinity;
+  return (Date.now() - new Date(lastVerified).getTime()) / 86400000;
 }
 
 function staleness(lastVerified) {
-  if (!lastVerified) return 'red';
-  const days = (Date.now() - new Date(lastVerified).getTime()) / 86400000;
-  if (days >= 90) return 'red';
+  const days = daysAgo(lastVerified);
+  if (days >= 60) return 'red';
   if (days >= 30) return 'amber';
   return null;
 }
 
+function relativeAge(lastVerified) {
+  if (!lastVerified) return 'Never';
+  const days = daysAgo(lastVerified);
+  if (days < 1)  return 'Today';
+  if (days < 2)  return '1 day';
+  if (days < 7)  return `${Math.floor(days)} days`;
+  if (days < 14) return '1 week';
+  if (days < 21) return '2 weeks';
+  if (days < 28) return '3 weeks';
+  const months = Math.floor(days / 30);
+  return months === 1 ? '1 month' : `${months} months`;
+}
+
 function VerifiedCell({ lastVerified, onVerify, verifying }) {
   const stale = staleness(lastVerified);
+  const age   = relativeAge(lastVerified);
   return (
     <div className="verified-cell">
-      <span className={stale ? `stale-badge stale-${stale}` : 'stale-badge stale-ok'}>
-        {stale === 'red' ? '●' : stale === 'amber' ? '●' : '✓'}&nbsp;
-        {lastVerified ? fmt(lastVerified) : 'Never'}
+      <span
+        className={stale ? `stale-badge stale-${stale}` : 'stale-badge stale-ok'}
+        title={lastVerified ? new Date(lastVerified).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Never verified'}
+      >
+        {stale === 'red' ? '●' : stale === 'amber' ? '●' : '✓'}&nbsp;{age}
       </span>
       <button
         className="btn-icon verify-btn"
-        title="Verify Stock"
+        title="Mark as verified"
         onClick={onVerify}
         disabled={verifying}
       >
@@ -187,10 +200,29 @@ export default function Inventory() {
 
   const isFiltered = search || categoryFilter || itemTypeFilter || statusFilter || staleFilter;
 
+  const overdueCount = items.filter((i) => staleness(i.last_verified) === 'red').length;
+
   const categoryTree = buildCategoryTree(categories);
 
   return (
     <main className="main-content">
+      {/* Overdue notice */}
+      {overdueCount > 0 && (
+        <div className="overdue-notice">
+          <span className="overdue-notice-icon">&#9888;</span>
+          <span>
+            <strong>{overdueCount} item{overdueCount !== 1 ? 's' : ''}</strong> haven't been
+            verified in 2+ months — time for a stock check.
+          </span>
+          <button
+            className="overdue-notice-filter"
+            onClick={() => setStale('red')}
+          >
+            Show overdue
+          </button>
+        </div>
+      )}
+
       {/* Page header */}
       <div className="page-header">
         <div>
