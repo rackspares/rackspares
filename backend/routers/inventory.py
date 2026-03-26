@@ -25,8 +25,11 @@ def _serialize(v):
 def _item_snapshot(item: models.InventoryItem) -> dict:
     return {
         "name": item.name,
-        "category": item.category,
+        "category_id": item.category_id,
+        "item_type": _serialize(item.item_type),
         "quantity": item.quantity,
+        "minimum_stock": item.minimum_stock,
+        "lead_time_days": item.lead_time_days,
         "location": item.location,
         "status": _serialize(item.status),
         "description": item.description,
@@ -52,12 +55,25 @@ def _write_audit(
     ))
 
 
+def _get_descendant_ids(db: Session, cat_id: int) -> List[int]:
+    """Return cat_id plus all descendant category IDs (max depth 3)."""
+    ids = [cat_id]
+    children = db.query(models.Category).filter(models.Category.parent_id == cat_id).all()
+    for child in children:
+        ids.append(child.id)
+        grandchildren = db.query(models.Category).filter(models.Category.parent_id == child.id).all()
+        for gc in grandchildren:
+            ids.append(gc.id)
+    return ids
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=List[schemas.InventoryItemOut])
 def list_items(
     search: Optional[str] = Query(default=None, max_length=200),
-    category: Optional[str] = Query(default=None),
+    category_id: Optional[int] = Query(default=None),
+    item_type: Optional[schemas.ItemType] = Query(default=None),
     status: Optional[schemas.ItemStatus] = Query(default=None),
     stale: Optional[str] = Query(default=None, pattern="^(any|amber|red)$"),
     db: Session = Depends(get_db),
@@ -74,12 +90,14 @@ def list_items(
                 models.InventoryItem.location.ilike(term),
             )
         )
-    if category:
-        q = q.filter(models.InventoryItem.category == category)
+    if category_id is not None:
+        ids = _get_descendant_ids(db, category_id)
+        q = q.filter(models.InventoryItem.category_id.in_(ids))
+    if item_type:
+        q = q.filter(models.InventoryItem.item_type == item_type)
     if status:
         q = q.filter(models.InventoryItem.status == status)
     if stale:
-        # amber = 30+ days unverified; red = 90+ days unverified
         cutoff_days = 90 if stale == "red" else 30
         cutoff = datetime.now(timezone.utc) - timedelta(days=cutoff_days)
         q = q.filter(
@@ -92,15 +110,49 @@ def list_items(
     return q.order_by(models.InventoryItem.date_added.desc()).all()
 
 
+@router.get("/reorder", response_model=List[schemas.ReorderAlertOut])
+def reorder_alerts(
+    db: Session = Depends(get_db),
+    _: models.User = Depends(require_manager_or_admin),
+):
+    """Return consumable items where quantity < minimum_stock."""
+    items = (
+        db.query(models.InventoryItem)
+        .filter(
+            models.InventoryItem.item_type == models.ItemType.consumable,
+            models.InventoryItem.minimum_stock != None,  # noqa: E711
+            models.InventoryItem.quantity < models.InventoryItem.minimum_stock,
+        )
+        .order_by(models.InventoryItem.quantity)
+        .all()
+    )
+
+    result = []
+    for item in items:
+        shortfall = item.minimum_stock - item.quantity
+        urgency = "critical" if item.quantity == 0 else "warning"
+        base = schemas.InventoryItemOut.model_validate(item)
+        result.append(schemas.ReorderAlertOut(
+            **base.model_dump(),
+            shortfall=shortfall,
+            urgency=urgency,
+        ))
+    return result
+
+
 @router.post("/", response_model=schemas.InventoryItemOut, status_code=201)
 def create_item(
     item: schemas.InventoryItemCreate,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(require_manager_or_admin),
 ):
+    if item.category_id is not None:
+        if not db.query(models.Category).filter(models.Category.id == item.category_id).first():
+            raise HTTPException(status_code=404, detail="Category not found")
+
     db_item = models.InventoryItem(**item.model_dump())
     db.add(db_item)
-    db.flush()  # get db_item.id before audit log
+    db.flush()
     _write_audit(db, current_user, models.AuditAction.create, db_item, _item_snapshot(db_item))
     db.commit()
     db.refresh(db_item)
@@ -130,8 +182,12 @@ def update_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    before = _item_snapshot(item)
     updates = payload.model_dump(exclude_unset=True)
+    if "category_id" in updates and updates["category_id"] is not None:
+        if not db.query(models.Category).filter(models.Category.id == updates["category_id"]).first():
+            raise HTTPException(status_code=404, detail="Category not found")
+
+    before = _item_snapshot(item)
     for field, value in updates.items():
         setattr(item, field, value)
     item.last_updated = datetime.now(timezone.utc)

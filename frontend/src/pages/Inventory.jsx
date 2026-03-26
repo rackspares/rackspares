@@ -4,11 +4,6 @@ import { useAuth } from '../App.jsx';
 import InventoryForm from '../components/InventoryForm.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
-const CATEGORIES = [
-  'Server', 'Network', 'Storage', 'Power',
-  'Cooling', 'Cable', 'Accessory', 'Other',
-];
-
 function fmt(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('en-US', {
@@ -66,15 +61,42 @@ function ConfirmDialog({ itemName, onConfirm, onCancel, deleting }) {
   );
 }
 
+function buildCategoryTree(flat) {
+  const map = {};
+  flat.forEach((c) => (map[c.id] = { ...c, children: [] }));
+  const roots = [];
+  flat.forEach((c) => {
+    if (c.parent_id && map[c.parent_id]) {
+      map[c.parent_id].children.push(map[c.id]);
+    } else {
+      roots.push(map[c.id]);
+    }
+  });
+  return roots;
+}
+
+function CategoryOptions({ nodes, depth = 0 }) {
+  return nodes.map((node) => (
+    <React.Fragment key={node.id}>
+      <option value={node.id}>{'  '.repeat(depth)}{depth > 0 ? '↳ ' : ''}{node.name}</option>
+      {node.children.length > 0 && (
+        <CategoryOptions nodes={node.children} depth={depth + 1} />
+      )}
+    </React.Fragment>
+  ));
+}
+
 export default function Inventory() {
   const { user } = useAuth();
   const role = user?.role;
   const canEdit = role === 'admin' || role === 'manager';
 
   const [items, setItems]               = useState([]);
+  const [categories, setCategories]     = useState([]);
   const [fetching, setFetching]         = useState(true);
   const [search, setSearch]             = useState('');
   const [categoryFilter, setCategory]   = useState('');
+  const [itemTypeFilter, setItemType]   = useState('');
   const [statusFilter, setStatus]       = useState('');
   const [staleFilter, setStale]         = useState('');
   const [showForm, setShowForm]         = useState(false);
@@ -82,7 +104,11 @@ export default function Inventory() {
   const [saving, setSaving]             = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting]         = useState(false);
-  const [verifying, setVerifying]       = useState(null); // item id being verified
+  const [verifying, setVerifying]       = useState(null);
+
+  useEffect(() => {
+    api.get('/categories/').then((res) => setCategories(res.data)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,10 +118,11 @@ export default function Inventory() {
       setFetching(true);
       try {
         const params = {};
-        if (search)         params.search   = search;
-        if (categoryFilter) params.category = categoryFilter;
-        if (statusFilter)   params.status   = statusFilter;
-        if (staleFilter)    params.stale    = staleFilter;
+        if (search)         params.search      = search;
+        if (categoryFilter) params.category_id = categoryFilter;
+        if (itemTypeFilter) params.item_type   = itemTypeFilter;
+        if (statusFilter)   params.status      = statusFilter;
+        if (staleFilter)    params.stale       = staleFilter;
         const res = await api.get('/inventory/', { params });
         if (!cancelled) setItems(res.data);
       } catch (err) {
@@ -106,7 +133,7 @@ export default function Inventory() {
     }, delay);
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [search, categoryFilter, statusFilter, staleFilter]);
+  }, [search, categoryFilter, itemTypeFilter, statusFilter, staleFilter]);
 
   const refresh = () => setSearch((s) => s);
 
@@ -158,12 +185,14 @@ export default function Inventory() {
   const openEdit = (item) => { setEditItem(item); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditItem(null); };
 
-  const isFiltered = search || categoryFilter || statusFilter || staleFilter;
+  const isFiltered = search || categoryFilter || itemTypeFilter || statusFilter || staleFilter;
 
   const totalQty       = items.reduce((s, i) => s + i.quantity, 0);
   const availableCount = items.filter((i) => i.status === 'available').length;
   const faultyCount    = items.filter((i) => i.status === 'faulty').length;
   const staleCount     = items.filter((i) => staleness(i.last_verified) !== null).length;
+
+  const categoryTree = buildCategoryTree(categories);
 
   return (
     <main className="main-content">
@@ -224,7 +253,12 @@ export default function Inventory() {
         />
         <select className="filter-select" value={categoryFilter} onChange={(e) => setCategory(e.target.value)}>
           <option value="">All Categories</option>
-          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          <CategoryOptions nodes={categoryTree} />
+        </select>
+        <select className="filter-select" value={itemTypeFilter} onChange={(e) => setItemType(e.target.value)}>
+          <option value="">All Types</option>
+          <option value="asset">Asset</option>
+          <option value="consumable">Consumable</option>
         </select>
         <select className="filter-select" value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All Statuses</option>
@@ -240,7 +274,7 @@ export default function Inventory() {
         </select>
         {isFiltered && (
           <button className="btn btn-secondary" onClick={() => {
-            setSearch(''); setCategory(''); setStatus(''); setStale('');
+            setSearch(''); setCategory(''); setItemType(''); setStatus(''); setStale('');
           }}>
             Clear
           </button>
@@ -265,6 +299,7 @@ export default function Inventory() {
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Type</th>
                   <th>Category</th>
                   <th>Qty</th>
                   <th>Location</th>
@@ -281,11 +316,19 @@ export default function Inventory() {
                       <div className="col-name">{item.name}</div>
                       {item.description && <div className="col-desc">{item.description}</div>}
                     </td>
-                    <td>{item.category}</td>
+                    <td>
+                      <span className={`item-type-badge item-type-${item.item_type}`}>
+                        {item.item_type === 'consumable' ? 'Consumable' : 'Asset'}
+                      </span>
+                    </td>
+                    <td className="col-location">{item.category?.name || '—'}</td>
                     <td>
                       <span className={`qty${item.quantity === 0 ? ' zero' : item.quantity < 3 ? ' low' : ''}`}>
                         {item.quantity}
                       </span>
+                      {item.item_type === 'consumable' && item.minimum_stock != null && item.quantity < item.minimum_stock && (
+                        <span className="reorder-flag" title={`Min stock: ${item.minimum_stock}`}> !</span>
+                      )}
                     </td>
                     <td className="col-location">{item.location || '—'}</td>
                     <td><StatusBadge status={item.status} /></td>
@@ -324,7 +367,13 @@ export default function Inventory() {
       )}
 
       {showForm && (
-        <InventoryForm item={editItem} onSave={handleSave} onClose={closeForm} saving={saving} />
+        <InventoryForm
+          item={editItem}
+          categories={categories}
+          onSave={handleSave}
+          onClose={closeForm}
+          saving={saving}
+        />
       )}
 
       {deleteTarget && (

@@ -792,6 +792,150 @@ tbody tr:hover td {
   opacity: 1;
 }
 
+/* ── Item type badge ─────────────────────────────────────── */
+.item-type-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.item-type-asset {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.item-type-consumable {
+  background: #fef9c3;
+  color: #854d0e;
+}
+
+.reorder-flag {
+  color: #dc2626;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* ── Urgency badges (Reorder page) ───────────────────────── */
+.urgency-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.urgency-critical {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.urgency-warning {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* ── BOM status badges ───────────────────────────────────── */
+.bom-status-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.bom-draft {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.bom-submitted {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.bom-fulfilled {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+/* ── Category tree ───────────────────────────────────────── */
+.cat-node {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.cat-node:last-child {
+  border-bottom: none;
+}
+
+.cat-node-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px;
+  border-radius: 8px;
+  transition: background 0.12s;
+}
+
+.cat-node-row:hover {
+  background: #f8fafc;
+}
+
+.cat-node-name {
+  font-weight: 500;
+  color: #1e293b;
+  font-size: 14px;
+}
+
+.cat-node-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.cat-children {
+  padding-left: 24px;
+  border-left: 2px solid #e2e8f0;
+  margin-left: 12px;
+}
+
+.depth-1 .cat-node-name { color: #334155; }
+.depth-2 .cat-node-name { color: #475569; font-size: 13px; }
+
+/* ── Search dropdown (BOM item search) ───────────────────── */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 200;
+  overflow: hidden;
+}
+
+.search-dropdown-item {
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.12s;
+}
+
+.search-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.search-dropdown-item:hover {
+  background: #f8fafc;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media (max-width: 640px) {
   .stats-row {

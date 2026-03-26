@@ -26,7 +26,7 @@ export default function Navbar() {
       <div className="navbar-brand">
         <div className="navbar-brand-icon">&#9881;</div>
         RackSpares
-        <span className="version-tag">v0.2.0</span>
+        <span className="version-tag">v0.3.0</span>
       </div>
 
       <div className="navbar-nav">
@@ -36,6 +36,20 @@ export default function Navbar() {
           className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
         >
           Inventory
+        </NavLink>
+        {isManagerOrAdmin && (
+          <NavLink
+            to="/reorder"
+            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
+          >
+            Reorder
+          </NavLink>
+        )}
+        <NavLink
+          to="/boms"
+          className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
+        >
+          BOMs
         </NavLink>
         {isManagerOrAdmin && (
           <NavLink
@@ -51,6 +65,14 @@ export default function Navbar() {
             className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
           >
             Users
+          </NavLink>
+        )}
+        {isAdmin && (
+          <NavLink
+            to="/categories"
+            className={({ isActive }) => `navbar-link${isActive ? ' active' : ''}`}
+          >
+            Categories
           </NavLink>
         )}
       </div>

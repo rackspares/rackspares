@@ -92,7 +92,7 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="login-footer">v0.2.0 &bull; Apache 2.0 Open Source</div>
+        <div className="login-footer">v0.3.0 &bull; Apache 2.0 Open Source</div>
       </div>
     </div>
   );

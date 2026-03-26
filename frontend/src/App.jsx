@@ -7,6 +7,10 @@ import Login from './pages/Login.jsx';
 import UserManagement from './pages/UserManagement.jsx';
 import AuditLog from './pages/AuditLog.jsx';
 import ChangePassword from './pages/ChangePassword.jsx';
+import CategoryManagement from './pages/CategoryManagement.jsx';
+import Reorder from './pages/Reorder.jsx';
+import BOMs from './pages/BOMs.jsx';
+import BOMDetail from './pages/BOMDetail.jsx';
 
 export const AuthContext = createContext(null);
 
@@ -69,6 +73,30 @@ export default function App() {
           <Route
             path="/change-password"
             element={user ? <ChangePassword /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/categories"
+            element={
+              !user ? <Navigate to="/login" replace />
+              : isAdmin ? <CategoryManagement />
+              : <Navigate to="/" replace />
+            }
+          />
+          <Route
+            path="/reorder"
+            element={
+              !user ? <Navigate to="/login" replace />
+              : isManagerOrAdmin ? <Reorder />
+              : <Navigate to="/" replace />
+            }
+          />
+          <Route
+            path="/boms"
+            element={user ? <BOMs /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/boms/:id"
+            element={user ? <BOMDetail /> : <Navigate to="/login" replace />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

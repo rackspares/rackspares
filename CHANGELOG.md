@@ -5,6 +5,33 @@ All notable changes to RackSpares will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-26
+
+### Added
+- **Item type** — `asset` or `consumable` field on every inventory item; shown as a colour-coded badge in the inventory table; filterable in the inventory list
+- **Minimum stock & lead time** — `minimum_stock` and `lead_time_days` fields on consumable items; reorder flag (!) shown inline when stock is below threshold
+- **Reorder alerts page** — lists all consumables below their minimum stock; urgency badges (Critical = zero stock, Warning = low stock); accessible to Manager and Admin
+- **BOM (Bill of Materials) workflow** — full shopping-cart style procurement tracking: create draft BOMs, add/remove/update inventory line items, submit for review, mark fulfilled; per-item computed fields: in-stock quantity and quantity-to-order
+- **CSV export** — download any BOM as a CSV file with columns: Item, Category, Type, In Stock, Needed, To Order
+- **Configurable category system** — `Category` model with self-referential `parent_id` (max 3 levels); replaces the hardcoded category string; Admin-only CRUD management page with expandable tree view; inventory form uses cascading dropdown
+- **Audit log coverage** — BOM and category actions now appear in the audit log alongside inventory events
+- `Category` database table: id, name, parent_id (self-referential FK), created_by, created_at
+- `BOM` and `BOMItem` database tables with status enum (draft/submitted/fulfilled) and cascade delete
+- `item_type`, `minimum_stock`, `lead_time_days`, `category_id` columns on `inventory_items`; old text `category` column migrated to FK references and dropped
+- New API routes: `/api/categories/`, `/api/boms/`, `/api/inventory/reorder`
+- Default category seed data (8 top-level categories) on first startup
+
+### Changed
+- Inventory `category` text field replaced by `category_id` FK to the categories table; existing category strings are migrated to category rows automatically
+- Inventory list category filter now matches item and all descendants (hierarchical)
+- Navbar updated: Reorder, BOMs, and Categories links added; version tag updated to v0.3.0
+
+### Migration note
+> v0.3.0 changes the database schema (new tables and columns). The startup migration is **idempotent** — simply rebuild and restart:
+> ```
+> docker compose up --build -d
+> ```
+
 ## [0.2.0] - 2026-03-26
 
 ### Added
