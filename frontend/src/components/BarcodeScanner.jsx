@@ -3,6 +3,91 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 const WANTED_FORMATS = ['qr_code', 'ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'data_matrix', 'aztec', 'pdf417'];
 
 /**
+ * Preprocess an image file for OCR:
+ *   1. Upscale so the longest side is at least 2000px (Tesseract needs large text)
+ *   2. Convert to grayscale
+ *   3. Stretch contrast (normalize to full 0-255 range)
+ *   4. Binarize using Otsu's method (pure black/white — eliminates background noise)
+ *
+ * Returns a Blob (PNG) of the processed image.
+ */
+async function preprocessForOcr(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+
+      // Scale up if image is small — Tesseract accuracy improves a lot above ~150 DPI equivalent
+      const TARGET = 2000;
+      const scale = img.width < TARGET && img.height < TARGET
+        ? TARGET / Math.max(img.width, img.height)
+        : 1;
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const imageData = ctx.getImageData(0, 0, w, h);
+      const d = imageData.data;
+
+      // Pass 1: convert to grayscale, find min/max for contrast stretch
+      const gray = new Uint8Array(w * h);
+      let lo = 255, hi = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+        gray[i >> 2] = g;
+        if (g < lo) lo = g;
+        if (g > hi) hi = g;
+      }
+
+      // Pass 2: contrast stretch then build histogram for Otsu threshold
+      const range = hi - lo || 1;
+      const hist = new Array(256).fill(0);
+      const stretched = new Uint8Array(w * h);
+      for (let i = 0; i < gray.length; i++) {
+        const s = Math.round(((gray[i] - lo) / range) * 255);
+        stretched[i] = s;
+        hist[s]++;
+      }
+
+      // Otsu's threshold
+      const total = w * h;
+      let sum = 0;
+      for (let t = 0; t < 256; t++) sum += t * hist[t];
+      let sumB = 0, wB = 0, maxVar = 0, threshold = 128;
+      for (let t = 0; t < 256; t++) {
+        wB += hist[t];
+        if (!wB) continue;
+        const wF = total - wB;
+        if (!wF) break;
+        sumB += t * hist[t];
+        const mB = sumB / wB;
+        const mF = (sum - sumB) / wF;
+        const v = wB * wF * (mB - mF) ** 2;
+        if (v > maxVar) { maxVar = v; threshold = t; }
+      }
+
+      // Pass 3: write binarized (black text on white) back to imageData
+      for (let i = 0; i < d.length; i += 4) {
+        const v = stretched[i >> 2] < threshold ? 0 : 255;
+        d[i] = d[i + 1] = d[i + 2] = v;
+        d[i + 3] = 255;
+      }
+      ctx.putImageData(imageData, 0, 0);
+
+      canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')), 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); }; // fallback to original
+    img.src = url;
+  });
+}
+
+/**
  * BarcodeScanner
  *
  * Props:
@@ -151,25 +236,32 @@ export default function BarcodeScanner({ onScan, onTextFound, onError }) {
     // ── 2. OCR — always run so text data is available ────────────────────────
     setUploadState('ocr');
     try {
-      const { recognize } = await import('tesseract.js');
-      const { data } = await recognize(file, 'eng', { logger: () => {} });
+      const { createWorker } = await import('tesseract.js');
+
+      // Pre-process: upscale + grayscale + binarize for much better label OCR
+      const processed = await preprocessForOcr(file);
+
+      const worker = await createWorker('eng', 1, { logger: () => {} });
+      // PSM 11 = sparse text (best for hardware labels with mixed layouts)
+      await worker.setParameters({ tessedit_pageseg_mode: '11' });
+      const { data } = await worker.recognize(processed);
+      await worker.terminate();
 
       const lines = (data.lines || [])
         .filter((l) => {
           const t = l.text.trim();
-          if (l.confidence < 60) return false;               // low-confidence read
-          if (t.length < 4) return false;                    // too short
+          if (l.confidence < 55) return false;
+          if (t.length < 3) return false;
           const alnum = t.replace(/[^a-zA-Z0-9]/g, '');
-          if (alnum.length < 3) return false;                // mostly symbols/spaces
-          const garbage = t.replace(/[a-zA-Z0-9 \-./()]/g, '').length;
-          if (garbage / t.length > 0.3) return false;       // >30% weird chars = noise
+          if (alnum.length < 2) return false;
+          const garbage = t.replace(/[a-zA-Z0-9 \-./(),:]/g, '').length;
+          if (garbage / t.length > 0.35) return false;
           return true;
         })
-        .sort((a, b) => b.confidence - a.confidence)        // best confidence first
-        .slice(0, 10)                                        // max 10 lines
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 10)
         .map((l) => l.text.trim());
 
-      // Deduplicate near-identical lines
       const seen = new Set();
       const unique = lines.filter((t) => {
         const key = t.toLowerCase().replace(/\s+/g, '');
@@ -181,7 +273,7 @@ export default function BarcodeScanner({ onScan, onTextFound, onError }) {
       if (unique.length > 0) {
         onTextFound?.(unique);
       } else if (!barcodeFound) {
-        setUploadError('No barcode or readable text found. Try a clearer, closer shot.');
+        setUploadError('No readable text found. Try a closer, well-lit shot with the label flat and in focus.');
       }
     } catch (err) {
       if (!barcodeFound) {
