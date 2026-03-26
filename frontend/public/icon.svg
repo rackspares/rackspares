@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="36" fill="#0f172a"/>
+  <!-- Rack unit 1 -->
+  <rect x="24" y="40" width="144" height="32" rx="6" fill="#2563eb"/>
+  <circle cx="156" cy="56" r="5" fill="#4ade80"/>
+  <rect x="36" y="50" width="60" height="5" rx="2" fill="#93c5fd" opacity="0.7"/>
+  <rect x="36" y="59" width="40" height="4" rx="2" fill="#1e40af" opacity="0.5"/>
+  <!-- Rack unit 2 -->
+  <rect x="24" y="80" width="144" height="32" rx="6" fill="#1e293b"/>
+  <circle cx="156" cy="96" r="5" fill="#4ade80"/>
+  <rect x="36" y="90" width="80" height="5" rx="2" fill="#475569" opacity="0.7"/>
+  <rect x="36" y="99" width="50" height="4" rx="2" fill="#334155" opacity="0.5"/>
+  <!-- Rack unit 3 -->
+  <rect x="24" y="120" width="144" height="32" rx="6" fill="#1e293b"/>
+  <circle cx="156" cy="136" r="5" fill="#f59e0b"/>
+  <rect x="36" y="130" width="60" height="5" rx="2" fill="#475569" opacity="0.7"/>
+  <rect x="36" y="139" width="90" height="4" rx="2" fill="#334155" opacity="0.5"/>
+</svg>
