@@ -83,6 +83,15 @@ export default function Navbar() {
             </NavLink>
             {isManagerOrAdmin && (
               <NavLink
+                to="/receive"
+                className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                onClick={handleNavLink}
+              >
+                Receive Shipment
+              </NavLink>
+            )}
+            {isManagerOrAdmin && (
+              <NavLink
                 to="/reorder"
                 className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
                 onClick={handleNavLink}

@@ -1556,3 +1556,202 @@ tbody tr:hover td {
 
 .scanner-error-icon { font-size: 28px; color: var(--color-danger); }
 .scanner-error-msg  { font-size: 14px; color: var(--color-danger); line-height: 1.5; }
+
+/* ── Receive Shipment page ────────────────────────────────── */
+
+.receive-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.receive-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.receive-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+  flex: 1;
+  margin: 0;
+}
+
+.btn-ghost {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.btn-ghost:hover { background: var(--color-surface-2); color: var(--color-text); }
+
+.receive-steps {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.receive-step {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-faint);
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+.receive-step.active {
+  background: var(--color-accent-faint);
+  color: var(--color-accent);
+}
+.receive-step.done {
+  color: var(--color-success-text);
+}
+
+.receive-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.receive-manual-toggle {
+  display: flex;
+  justify-content: center;
+}
+
+.receive-manual-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  max-width: 480px;
+}
+
+.receive-manual-input { flex: 1; }
+
+.receive-lookup-status {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 8px;
+}
+
+.receive-lookup-badge {
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 8px;
+  text-align: center;
+}
+.receive-lookup-badge.found {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+.receive-lookup-badge.not-found {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+.receive-form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.receive-form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.receive-confirm-btn { min-width: 140px; }
+
+/* Done state */
+.receive-done {
+  align-items: center;
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.receive-done-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.receive-done-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 12px 0 4px;
+}
+
+.receive-done-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.receive-done-meta {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 8px;
+}
+
+.receive-done-note {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-2);
+  padding: 8px 14px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.receive-done-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Mobile-first: full-bleed on small screens */
+@media (max-width: 640px) {
+  .receive-page {
+    padding: 12px;
+  }
+  .receive-form {
+    padding: 14px;
+  }
+  .receive-form-actions {
+    flex-direction: column-reverse;
+  }
+  .receive-form-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+  .receive-confirm-btn { min-width: unset; }
+}

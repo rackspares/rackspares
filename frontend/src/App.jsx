@@ -17,6 +17,7 @@ import NetboxBrowse from './pages/NetboxBrowse.jsx';
 import CloneARack from './pages/CloneARack.jsx';
 import OpticCompatibility from './pages/OpticCompatibility.jsx';
 import UserPreferences from './pages/UserPreferences.jsx';
+import ReceiveShipment from './pages/ReceiveShipment.jsx';
 
 export const AuthContext = createContext(null);
 export const ThemeContext = createContext({ theme: 'dark', accent: '#2563eb', setTheme: () => {}, setAccent: () => {} });
@@ -175,6 +176,14 @@ export default function App() {
             <Route
               path="/preferences"
               element={user ? <UserPreferences /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/receive"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isManagerOrAdmin ? <ReceiveShipment />
+                : <Navigate to="/" replace />
+              }
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
