@@ -66,6 +66,7 @@ export default function ReceiveShipment() {
   const [scanKey, setScanKey] = useState(0);
   const [manualCode, setManualCode] = useState('');
   const [showManual, setShowManual] = useState(false);
+  const [ocrLines, setOcrLines] = useState([]);       // text extracted from uploaded photo
 
   useEffect(() => {
     api.get('/categories/').then((r) => setCategories(r.data)).catch(() => {});
@@ -83,9 +84,21 @@ export default function ReceiveShipment() {
 
   // ── scan handling ──────────────────────────────────────────────────────────
 
+  // Called by BarcodeScanner when OCR text is extracted from an uploaded photo.
+  // If we're still on the scan step (no barcode found), move to review with OCR data.
+  function handleTextFound(lines) {
+    setOcrLines(lines);
+    if (step === 'scan') {
+      // No barcode was found — go to review with OCR text as the only source
+      setStep('review');
+      setLookupResult({ found: false });
+    }
+  }
+
   async function handleScan(code) {
     setScannedCode(code);
     setLookupResult(null);
+    setOcrLines([]);
     setForm({ ...EMPTY_FORM, serial_number: code });
     setStep('review');
 
@@ -213,6 +226,7 @@ export default function ReceiveShipment() {
     setStep('scan');
     setScannedCode('');
     setLookupResult(null);
+    setOcrLines([]);
     setForm(EMPTY_FORM);
     setErrors({});
     setSavedItem(null);
@@ -284,7 +298,7 @@ export default function ReceiveShipment() {
       {/* ── STEP: scan ── */}
       {step === 'scan' && (
         <div className="receive-body">
-          <BarcodeScanner key={scanKey} onScan={handleScan} />
+          <BarcodeScanner key={scanKey} onScan={handleScan} onTextFound={handleTextFound} />
           <div className="receive-manual-toggle">
             {showManual ? (
               <form className="receive-manual-form" onSubmit={handleManualSubmit}>
@@ -318,6 +332,37 @@ export default function ReceiveShipment() {
           )}
           {lookupResult?.found === false && (
             <div className="receive-lookup-badge not-found">No product match — enter details below</div>
+          )}
+
+          {ocrLines.length > 0 && (
+            <div className="ocr-panel">
+              <div className="ocr-panel-header">
+                <span className="ocr-panel-title">Text found in photo</span>
+                <span className="ocr-panel-hint">Tap a line to fill Name · long-press for Serial</span>
+              </div>
+              <div className="ocr-chips">
+                {ocrLines.map((line, i) => (
+                  <div key={i} className="ocr-chip-row">
+                    <button
+                      type="button"
+                      className="ocr-chip"
+                      onClick={() => set('name', line)}
+                      title="Use as Name"
+                    >
+                      {line}
+                    </button>
+                    <button
+                      type="button"
+                      className="ocr-chip-sn"
+                      onClick={() => set('serial_number', line)}
+                      title="Use as Serial Number"
+                    >
+                      S/N
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           <form className="receive-form" onSubmit={isBulk ? handleAddToStaging : handleSingleConfirm}>

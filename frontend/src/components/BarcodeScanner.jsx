@@ -5,15 +5,16 @@ const WANTED_FORMATS = ['qr_code', 'ean_13', 'ean_8', 'code_128', 'code_39', 'up
 /**
  * BarcodeScanner
  *
- * Renders a live camera viewfinder and calls onScan(rawValue) once a barcode
- * is detected. Falls back to an image-upload button when the live camera is
- * unavailable (HTTP without HTTPS, permission denied, etc.).
- *
  * Props:
- *   onScan(code: string) — called with the decoded value
- *   onError(msg: string) — optional, called on unrecoverable camera errors
+ *   onScan(code: string)          — called when a barcode/QR is decoded
+ *   onTextFound(lines: string[])  — called with OCR text lines from an uploaded photo
+ *   onError(msg: string)          — optional, called on unrecoverable camera errors
+ *
+ * When camera is unavailable (HTTP, permission denied) shows a photo-upload UI.
+ * Uploaded photos are decoded for barcodes first; OCR runs in parallel and the
+ * extracted text is passed to onTextFound regardless of whether a barcode was found.
  */
-export default function BarcodeScanner({ onScan, onError }) {
+export default function BarcodeScanner({ onScan, onTextFound, onError }) {
   const videoRef    = useRef(null);
   const streamRef   = useRef(null);
   const controlsRef = useRef(null);
@@ -21,14 +22,13 @@ export default function BarcodeScanner({ onScan, onError }) {
   const firedRef    = useRef(false);
   const fileRef     = useRef(null);
 
-  const [ready, setReady] = useState(false);
-  const [cameraError, setCameraError] = useState(null);   // non-fatal: show upload fallback
-  const [uploadError, setUploadError] = useState(null);   // "no barcode found in photo"
-  const [decoding, setDecoding] = useState(false);
+  const [ready, setReady]           = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const [uploadState, setUploadState] = useState(null); // null | 'decoding' | 'ocr' | 'error'
+  const [uploadError, setUploadError] = useState(null);
 
   const hasCameraApi = !!navigator.mediaDevices?.getUserMedia;
 
-  // Stop live camera — safe to call multiple times
   const stop = useCallback(() => {
     if (rafRef.current)      { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (controlsRef.current) { try { controlsRef.current.stop(); } catch {} controlsRef.current = null; }
@@ -45,8 +45,7 @@ export default function BarcodeScanner({ onScan, onError }) {
   // ── live camera ────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!hasCameraApi) return; // skip — will show upload UI
-
+    if (!hasCameraApi) return;
     let cancelled = false;
 
     async function start() {
@@ -73,7 +72,6 @@ export default function BarcodeScanner({ onScan, onError }) {
       }
       if (!cancelled) setReady(true);
 
-      // Path A: native BarcodeDetector
       if ('BarcodeDetector' in window) {
         let detector = null;
         try {
@@ -81,16 +79,12 @@ export default function BarcodeScanner({ onScan, onError }) {
           const formats = supported.length ? WANTED_FORMATS.filter((f) => supported.includes(f)) : WANTED_FORMATS;
           detector = new BarcodeDetector({ formats: formats.length ? formats : ['qr_code'] });
         } catch {}
-
         if (detector) {
           const tick = async () => {
             if (cancelled || firedRef.current) return;
             const vid = videoRef.current;
             if (vid && vid.readyState >= vid.HAVE_ENOUGH_DATA) {
-              try {
-                const codes = await detector.detect(vid);
-                if (codes.length > 0) { handleResult(codes[0].rawValue); return; }
-              } catch {}
+              try { const codes = await detector.detect(vid); if (codes.length > 0) { handleResult(codes[0].rawValue); return; } } catch {}
             }
             rafRef.current = requestAnimationFrame(tick);
           };
@@ -99,7 +93,6 @@ export default function BarcodeScanner({ onScan, onError }) {
         }
       }
 
-      // Path B: ZXing fallback
       try {
         const { BrowserMultiFormatReader } = await import('@zxing/browser');
         if (cancelled) return;
@@ -109,11 +102,7 @@ export default function BarcodeScanner({ onScan, onError }) {
         });
         controlsRef.current = reader;
       } catch (err) {
-        if (!cancelled) {
-          const msg = `Scanner failed to initialise: ${err.message}`;
-          setCameraError(msg);
-          onError?.(msg);
-        }
+        if (!cancelled) { const msg = `Scanner failed: ${err.message}`; setCameraError(msg); onError?.(msg); }
       }
     }
 
@@ -121,13 +110,16 @@ export default function BarcodeScanner({ onScan, onError }) {
     return () => { cancelled = true; stop(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── image upload decode ─────────────────────────────────────────────────────
+  // ── image upload: barcode + OCR ────────────────────────────────────────────
 
   async function decodeFromFile(file) {
     setUploadError(null);
-    setDecoding(true);
+    setUploadState('decoding');
+
+    let barcodeFound = false;
+
+    // ── 1. Try barcode decode ────────────────────────────────────────────────
     try {
-      // Path A: native BarcodeDetector on an ImageBitmap
       if ('BarcodeDetector' in window) {
         const bitmap = await createImageBitmap(file);
         try {
@@ -135,30 +127,49 @@ export default function BarcodeScanner({ onScan, onError }) {
           const formats = supported.length ? WANTED_FORMATS.filter((f) => supported.includes(f)) : WANTED_FORMATS;
           const detector = new BarcodeDetector({ formats: formats.length ? formats : ['qr_code'] });
           const codes = await detector.detect(bitmap);
-          if (codes.length > 0) { handleResult(codes[0].rawValue); return; }
+          if (codes.length > 0) { barcodeFound = true; handleResult(codes[0].rawValue); }
         } catch {}
       }
 
-      // Path B: ZXing on an img element
-      const { BrowserMultiFormatReader } = await import('@zxing/browser');
-      const url = URL.createObjectURL(file);
-      const img = new Image();
-      img.src = url;
-      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
-      try {
-        const reader = new BrowserMultiFormatReader();
-        const result = await reader.decodeFromImageElement(img);
-        URL.revokeObjectURL(url);
-        handleResult(result.getText());
-      } catch {
-        URL.revokeObjectURL(url);
-        setUploadError('No barcode found in that photo. Try a clearer, closer shot.');
+      if (!barcodeFound) {
+        try {
+          const { BrowserMultiFormatReader } = await import('@zxing/browser');
+          const url = URL.createObjectURL(file);
+          const img = new Image();
+          img.src = url;
+          await new Promise((res, rej) => { img.onload = res; img.onerror = rej; });
+          try {
+            const result = await new BrowserMultiFormatReader().decodeFromImageElement(img);
+            URL.revokeObjectURL(url);
+            barcodeFound = true;
+            handleResult(result.getText());
+          } catch { URL.revokeObjectURL(url); }
+        } catch {}
+      }
+    } catch {}
+
+    // ── 2. OCR — always run so text data is available ────────────────────────
+    setUploadState('ocr');
+    try {
+      const { recognize } = await import('tesseract.js');
+      const { data } = await recognize(file, 'eng', { logger: () => {} });
+
+      // Collect meaningful lines: length ≥ 3, not pure whitespace/punctuation
+      const lines = (data.lines || [])
+        .map((l) => l.text.trim())
+        .filter((t) => t.length >= 3 && /[a-zA-Z0-9]/.test(t));
+
+      if (lines.length > 0) {
+        onTextFound?.(lines);
+      } else if (!barcodeFound) {
+        setUploadError('No barcode or readable text found. Try a clearer, closer shot.');
       }
     } catch (err) {
-      setUploadError(`Could not read image: ${err.message}`);
+      if (!barcodeFound) {
+        setUploadError(`Could not process image: ${err.message}`);
+      }
     } finally {
-      setDecoding(false);
-      // Reset file input so the same file can be re-selected
+      setUploadState(null);
       if (fileRef.current) fileRef.current.value = '';
     }
   }
@@ -168,71 +179,62 @@ export default function BarcodeScanner({ onScan, onError }) {
     if (file) decodeFromFile(file);
   }
 
+  const uploadLabel = uploadState === 'decoding' ? 'Reading barcode…'
+                    : uploadState === 'ocr'      ? 'Extracting text…'
+                    : null;
+
+  const uploadButton = (label, small = false) => (
+    <label className={`btn btn-${small ? 'secondary scanner-upload-btn-sm' : 'primary scanner-upload-btn'}`}>
+      {uploadLabel || label}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        disabled={!!uploadState}
+        style={{ display: 'none' }}
+      />
+    </label>
+  );
+
   // ── render ─────────────────────────────────────────────────────────────────
 
-  const showUploadFallback = !hasCameraApi || cameraError;
+  const showUploadOnly = !hasCameraApi || cameraError;
 
-  // No camera API at all — show only upload UI
-  if (showUploadFallback) {
+  if (showUploadOnly) {
     const reason = !hasCameraApi
       ? (location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1'
           ? 'Live camera requires HTTPS.'
           : 'Live camera not available in this browser.')
       : cameraError;
-
     return (
       <div className="scanner-upload-only">
         <div className="scanner-upload-icon">&#128247;</div>
         <div className="scanner-upload-reason">{reason}</div>
         <p className="scanner-upload-hint">
-          Take a photo of the barcode or QR code with your camera app, then upload it below.
+          Take or choose a photo — barcodes will be decoded and any text extracted automatically.
         </p>
-        <label className="btn btn-primary scanner-upload-btn">
-          {decoding ? 'Reading barcode…' : 'Choose Photo'}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            disabled={decoding}
-            style={{ display: 'none' }}
-          />
-        </label>
+        {uploadButton('Choose Photo')}
         {uploadError && <div className="scanner-upload-error">{uploadError}</div>}
       </div>
     );
   }
 
-  // Live camera view + upload as secondary option
   return (
     <div className="scanner-wrapper">
       <video ref={videoRef} className="scanner-video" muted playsInline autoPlay />
       <div className="scanner-overlay">
         <div className="scanner-target">
-          <span className="scanner-corner tl" />
-          <span className="scanner-corner tr" />
-          <span className="scanner-corner bl" />
-          <span className="scanner-corner br" />
+          <span className="scanner-corner tl" /><span className="scanner-corner tr" />
+          <span className="scanner-corner bl" /><span className="scanner-corner br" />
           <div className="scanner-laser" />
         </div>
         <div className="scanner-hint">
           {ready ? 'Center the barcode in the frame' : 'Starting camera…'}
         </div>
       </div>
-
-      {/* Upload option shown below the viewfinder as an alternative */}
       <div className="scanner-upload-alt">
-        <label className="btn btn-secondary scanner-upload-btn-sm">
-          {decoding ? 'Reading…' : '&#128247; Upload photo instead'}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            disabled={decoding}
-            style={{ display: 'none' }}
-          />
-        </label>
+        {uploadButton('&#128247; Upload photo instead', true)}
         {uploadError && <div className="scanner-upload-error">{uploadError}</div>}
       </div>
     </div>
