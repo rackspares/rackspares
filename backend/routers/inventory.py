@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -138,6 +139,44 @@ def reorder_alerts(
             urgency=urgency,
         ))
     return result
+
+
+@router.get(
+    "/barcode-lookup",
+    summary="Look up product info for a barcode/UPC",
+    description=(
+        "Proxies a request to UPCItemDB (trial API) and returns normalised "
+        "product fields. Always succeeds — returns {found: false} when no "
+        "match exists or the upstream call fails."
+    ),
+)
+async def barcode_lookup(
+    code: str = Query(..., min_length=1, max_length=150, description="UPC / EAN / barcode string"),
+    _: models.User = Depends(get_current_user),
+):
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                "https://api.upcitemdb.com/prod/trial/lookup",
+                params={"upc": code},
+                headers={"Accept": "application/json"},
+            )
+        if resp.status_code == 200:
+            payload = resp.json()
+            hits = payload.get("items") or []
+            if hits:
+                hit = hits[0]
+                return {
+                    "found": True,
+                    "name":        hit.get("title") or hit.get("brand") or "",
+                    "brand":       hit.get("brand") or "",
+                    "model":       hit.get("model") or "",
+                    "description": hit.get("description") or "",
+                    "category":    hit.get("category") or "",
+                }
+    except Exception:
+        pass
+    return {"found": False}
 
 
 @router.post("/", response_model=schemas.InventoryItemOut, status_code=201)
