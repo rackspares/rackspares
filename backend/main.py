@@ -334,7 +334,18 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="RackSpares API", version="0.4.0", lifespan=lifespan)
+app = FastAPI(
+    title="RackSpares API",
+    version="0.5.0",
+    lifespan=lifespan,
+    docs_url="/api/docs",
+    redoc_url="/api/redoc",
+    openapi_url="/api/openapi.json",
+    description=(
+        "RackSpares inventory management API. "
+        "All endpoints (except /api/health) require a Bearer token obtained from POST /api/auth/login."
+    ),
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -356,4 +367,4 @@ app.include_router(preferences_router, prefix="/api/preferences", tags=["prefere
 
 @app.get("/api/health", tags=["health"])
 def health():
-    return {"status": "ok", "version": "0.4.0"}
+    return {"status": "ok", "version": "0.5.0"}

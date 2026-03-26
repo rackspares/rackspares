@@ -56,7 +56,7 @@ export default function Navbar() {
           }
         </div>
         RackSpares
-        <span className="version-tag">v0.4.1</span>
+        <span className="version-tag">v0.5.0</span>
       </div>
 
       {/* Navigation dropdown */}
