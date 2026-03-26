@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +11,19 @@ class ItemStatus(str, Enum):
     retired = "retired"
 
 
-# --- Auth ---
+class UserRole(str, Enum):
+    admin = "admin"
+    manager = "manager"
+    viewer = "viewer"
+
+
+class AuditAction(str, Enum):
+    create = "create"
+    update = "update"
+    delete = "delete"
+
+
+# --- Auth / Users ---
 
 class Token(BaseModel):
     access_token: str
@@ -21,9 +33,28 @@ class Token(BaseModel):
 class UserOut(BaseModel):
     id: int
     username: str
-    is_admin: bool
+    role: UserRole
+    is_active: bool
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=6)
+    role: UserRole = UserRole.viewer
+
+
+class UserUpdate(BaseModel):
+    role: Optional[UserRole] = None
+    password: Optional[str] = Field(default=None, min_length=6)
+    is_active: Optional[bool] = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=6)
 
 
 # --- Inventory ---
@@ -56,5 +87,22 @@ class InventoryItemOut(BaseModel):
     description: Optional[str]
     date_added: datetime
     last_updated: datetime
+    last_verified: Optional[datetime]
+
+    model_config = {"from_attributes": True}
+
+
+# --- Audit ---
+
+class AuditLogOut(BaseModel):
+    id: int
+    user_id: Optional[int]
+    username: Optional[str]
+    action: AuditAction
+    entity_type: str
+    entity_id: Optional[int]
+    entity_name: Optional[str]
+    changes: Optional[Dict[str, Any]]
+    timestamp: datetime
 
     model_config = {"from_attributes": True}

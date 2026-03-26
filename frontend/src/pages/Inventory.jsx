@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api.jsx';
+import { useAuth } from '../App.jsx';
 import InventoryForm from '../components/InventoryForm.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
@@ -15,6 +16,34 @@ function fmt(dateStr) {
   });
 }
 
+function staleness(lastVerified) {
+  if (!lastVerified) return 'red';
+  const days = (Date.now() - new Date(lastVerified).getTime()) / 86400000;
+  if (days >= 90) return 'red';
+  if (days >= 30) return 'amber';
+  return null;
+}
+
+function VerifiedCell({ lastVerified, onVerify, verifying }) {
+  const stale = staleness(lastVerified);
+  return (
+    <div className="verified-cell">
+      <span className={stale ? `stale-badge stale-${stale}` : 'stale-badge stale-ok'}>
+        {stale === 'red' ? '●' : stale === 'amber' ? '●' : '✓'}&nbsp;
+        {lastVerified ? fmt(lastVerified) : 'Never'}
+      </span>
+      <button
+        className="btn-icon verify-btn"
+        title="Verify Stock"
+        onClick={onVerify}
+        disabled={verifying}
+      >
+        &#10003;
+      </button>
+    </div>
+  );
+}
+
 function ConfirmDialog({ itemName, onConfirm, onCancel, deleting }) {
   return (
     <div className="confirm-overlay">
@@ -25,18 +54,10 @@ function ConfirmDialog({ itemName, onConfirm, onCancel, deleting }) {
           This cannot be undone.
         </div>
         <div className="confirm-actions">
-          <button
-            className="btn btn-secondary"
-            onClick={onCancel}
-            disabled={deleting}
-          >
+          <button className="btn btn-secondary" onClick={onCancel} disabled={deleting}>
             Cancel
           </button>
-          <button
-            className="btn btn-danger-outline"
-            onClick={onConfirm}
-            disabled={deleting}
-          >
+          <button className="btn btn-danger-outline" onClick={onConfirm} disabled={deleting}>
             {deleting ? 'Deleting...' : 'Delete'}
           </button>
         </div>
@@ -46,18 +67,23 @@ function ConfirmDialog({ itemName, onConfirm, onCancel, deleting }) {
 }
 
 export default function Inventory() {
+  const { user } = useAuth();
+  const role = user?.role;
+  const canEdit = role === 'admin' || role === 'manager';
+
   const [items, setItems]               = useState([]);
   const [fetching, setFetching]         = useState(true);
   const [search, setSearch]             = useState('');
   const [categoryFilter, setCategory]   = useState('');
   const [statusFilter, setStatus]       = useState('');
+  const [staleFilter, setStale]         = useState('');
   const [showForm, setShowForm]         = useState(false);
   const [editItem, setEditItem]         = useState(null);
   const [saving, setSaving]             = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting]         = useState(false);
+  const [verifying, setVerifying]       = useState(null); // item id being verified
 
-  // Fetch items whenever filters change (debounced for search)
   useEffect(() => {
     let cancelled = false;
     const delay = search ? 300 : 0;
@@ -69,6 +95,7 @@ export default function Inventory() {
         if (search)         params.search   = search;
         if (categoryFilter) params.category = categoryFilter;
         if (statusFilter)   params.status   = statusFilter;
+        if (staleFilter)    params.stale    = staleFilter;
         const res = await api.get('/inventory/', { params });
         if (!cancelled) setItems(res.data);
       } catch (err) {
@@ -78,16 +105,10 @@ export default function Inventory() {
       }
     }, delay);
 
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [search, categoryFilter, statusFilter]);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [search, categoryFilter, statusFilter, staleFilter]);
 
-  const refresh = () => {
-    // Trigger re-fetch by nudging a dep — simplest way without extra state
-    setSearch((s) => s);
-  };
+  const refresh = () => setSearch((s) => s);
 
   const handleSave = async (formData) => {
     setSaving(true);
@@ -121,16 +142,28 @@ export default function Inventory() {
     }
   };
 
-  const openAdd = () => { setEditItem(null); setShowForm(true); };
+  const handleVerify = async (item) => {
+    setVerifying(item.id);
+    try {
+      const res = await api.patch(`/inventory/${item.id}/verify`);
+      setItems((prev) => prev.map((i) => (i.id === item.id ? res.data : i)));
+    } catch (err) {
+      console.error('Verify failed', err);
+    } finally {
+      setVerifying(null);
+    }
+  };
+
+  const openAdd  = () => { setEditItem(null); setShowForm(true); };
   const openEdit = (item) => { setEditItem(item); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditItem(null); };
 
-  const isFiltered = search || categoryFilter || statusFilter;
+  const isFiltered = search || categoryFilter || statusFilter || staleFilter;
 
-  // Summary stats (computed from current result set)
-  const totalQty      = items.reduce((s, i) => s + i.quantity, 0);
+  const totalQty       = items.reduce((s, i) => s + i.quantity, 0);
   const availableCount = items.filter((i) => i.status === 'available').length;
   const faultyCount    = items.filter((i) => i.status === 'faulty').length;
+  const staleCount     = items.filter((i) => staleness(i.last_verified) !== null).length;
 
   return (
     <main className="main-content">
@@ -148,20 +181,22 @@ export default function Inventory() {
         </div>
         <div className="stat-card">
           <div className="stat-label">Available</div>
-          <div className="stat-value" style={{ color: '#16a34a' }}>
-            {availableCount}
-          </div>
+          <div className="stat-value" style={{ color: '#16a34a' }}>{availableCount}</div>
           <div className="stat-sub">ready to use</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Faulty</div>
-          <div
-            className="stat-value"
-            style={{ color: faultyCount > 0 ? '#dc2626' : '#0f172a' }}
-          >
+          <div className="stat-value" style={{ color: faultyCount > 0 ? '#dc2626' : '#0f172a' }}>
             {faultyCount}
           </div>
           <div className="stat-sub">need attention</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-label">Stale</div>
+          <div className="stat-value" style={{ color: staleCount > 0 ? '#d97706' : '#0f172a' }}>
+            {staleCount}
+          </div>
+          <div className="stat-sub">unverified 30d+</div>
         </div>
       </div>
 
@@ -169,13 +204,13 @@ export default function Inventory() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Inventory</h1>
-          <p className="page-subtitle">
-            {isFiltered ? 'Filtered results' : 'All items'}
-          </p>
+          <p className="page-subtitle">{isFiltered ? 'Filtered results' : 'All items'}</p>
         </div>
-        <button className="btn btn-primary" onClick={openAdd}>
-          + Add Item
-        </button>
+        {canEdit && (
+          <button className="btn btn-primary" onClick={openAdd}>
+            + Add Item
+          </button>
+        )}
       </div>
 
       {/* Search + filters */}
@@ -187,32 +222,26 @@ export default function Inventory() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
-          className="filter-select"
-          value={categoryFilter}
-          onChange={(e) => setCategory(e.target.value)}
-        >
+        <select className="filter-select" value={categoryFilter} onChange={(e) => setCategory(e.target.value)}>
           <option value="">All Categories</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
+          {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        <select
-          className="filter-select"
-          value={statusFilter}
-          onChange={(e) => setStatus(e.target.value)}
-        >
+        <select className="filter-select" value={statusFilter} onChange={(e) => setStatus(e.target.value)}>
           <option value="">All Statuses</option>
           <option value="available">Available</option>
           <option value="in_use">In Use</option>
           <option value="faulty">Faulty</option>
           <option value="retired">Retired</option>
         </select>
+        <select className="filter-select" value={staleFilter} onChange={(e) => setStale(e.target.value)}>
+          <option value="">All Verified</option>
+          <option value="any">Stale (30d+)</option>
+          <option value="red">Critical (90d+)</option>
+        </select>
         {isFiltered && (
-          <button
-            className="btn btn-secondary"
-            onClick={() => { setSearch(''); setCategory(''); setStatus(''); }}
-          >
+          <button className="btn btn-secondary" onClick={() => {
+            setSearch(''); setCategory(''); setStatus(''); setStale('');
+          }}>
             Clear
           </button>
         )}
@@ -221,17 +250,13 @@ export default function Inventory() {
       {/* Table */}
       <div className="card">
         {fetching ? (
-          <div style={{ textAlign: 'center', padding: '56px', color: '#94a3b8' }}>
-            Loading...
-          </div>
+          <div style={{ textAlign: 'center', padding: '56px', color: '#94a3b8' }}>Loading...</div>
         ) : items.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">&#128230;</div>
             <div className="empty-title">No items found</div>
             <div className="empty-text">
-              {isFiltered
-                ? 'Try adjusting your search or filters.'
-                : 'Add your first inventory item to get started.'}
+              {isFiltered ? 'Try adjusting your search or filters.' : 'Add your first inventory item to get started.'}
             </div>
           </div>
         ) : (
@@ -244,8 +269,8 @@ export default function Inventory() {
                   <th>Qty</th>
                   <th>Location</th>
                   <th>Status</th>
+                  <th>Last Verified</th>
                   <th>Date Added</th>
-                  <th>Last Updated</th>
                   <th></th>
                 </tr>
               </thead>
@@ -254,44 +279,36 @@ export default function Inventory() {
                   <tr key={item.id}>
                     <td>
                       <div className="col-name">{item.name}</div>
-                      {item.description && (
-                        <div className="col-desc">{item.description}</div>
-                      )}
+                      {item.description && <div className="col-desc">{item.description}</div>}
                     </td>
                     <td>{item.category}</td>
                     <td>
-                      <span
-                        className={`qty${
-                          item.quantity === 0
-                            ? ' zero'
-                            : item.quantity < 3
-                            ? ' low'
-                            : ''
-                        }`}
-                      >
+                      <span className={`qty${item.quantity === 0 ? ' zero' : item.quantity < 3 ? ' low' : ''}`}>
                         {item.quantity}
                       </span>
                     </td>
                     <td className="col-location">{item.location || '—'}</td>
                     <td><StatusBadge status={item.status} /></td>
+                    <td>
+                      <VerifiedCell
+                        lastVerified={item.last_verified}
+                        onVerify={() => handleVerify(item)}
+                        verifying={verifying === item.id}
+                      />
+                    </td>
                     <td className="col-date">{fmt(item.date_added)}</td>
-                    <td className="col-date">{fmt(item.last_updated)}</td>
                     <td>
                       <div className="col-actions">
-                        <button
-                          className="btn-icon"
-                          title="Edit"
-                          onClick={() => openEdit(item)}
-                        >
-                          &#9998;
-                        </button>
-                        <button
-                          className="btn-icon danger"
-                          title="Delete"
-                          onClick={() => setDeleteTarget(item)}
-                        >
-                          &#128465;
-                        </button>
+                        {canEdit && (
+                          <>
+                            <button className="btn-icon" title="Edit" onClick={() => openEdit(item)}>
+                              &#9998;
+                            </button>
+                            <button className="btn-icon danger" title="Delete" onClick={() => setDeleteTarget(item)}>
+                              &#128465;
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -303,22 +320,13 @@ export default function Inventory() {
       </div>
 
       {items.length > 0 && (
-        <div className="table-footer">
-          {items.length} item{items.length !== 1 ? 's' : ''}
-        </div>
+        <div className="table-footer">{items.length} item{items.length !== 1 ? 's' : ''}</div>
       )}
 
-      {/* Add / Edit modal */}
       {showForm && (
-        <InventoryForm
-          item={editItem}
-          onSave={handleSave}
-          onClose={closeForm}
-          saving={saving}
-        />
+        <InventoryForm item={editItem} onSave={handleSave} onClose={closeForm} saving={saving} />
       )}
 
-      {/* Delete confirmation */}
       {deleteTarget && (
         <ConfirmDialog
           itemName={deleteTarget.name}

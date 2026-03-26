@@ -4,6 +4,9 @@ import api from './api.jsx';
 import Navbar from './components/Navbar.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Login from './pages/Login.jsx';
+import UserManagement from './pages/UserManagement.jsx';
+import AuditLog from './pages/AuditLog.jsx';
+import ChangePassword from './pages/ChangePassword.jsx';
 
 export const AuthContext = createContext(null);
 
@@ -31,6 +34,9 @@ export default function App() {
     return <div className="loading">Loading...</div>;
   }
 
+  const isAdmin = user?.role === 'admin';
+  const isManagerOrAdmin = user?.role === 'admin' || user?.role === 'manager';
+
   return (
     <AuthContext.Provider value={{ user, setUser }}>
       <BrowserRouter>
@@ -43,6 +49,26 @@ export default function App() {
           <Route
             path="/"
             element={user ? <Inventory /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/users"
+            element={
+              !user ? <Navigate to="/login" replace />
+              : isAdmin ? <UserManagement />
+              : <Navigate to="/" replace />
+            }
+          />
+          <Route
+            path="/audit"
+            element={
+              !user ? <Navigate to="/login" replace />
+              : isManagerOrAdmin ? <AuditLog />
+              : <Navigate to="/" replace />
+            }
+          />
+          <Route
+            path="/change-password"
+            element={user ? <ChangePassword /> : <Navigate to="/login" replace />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
