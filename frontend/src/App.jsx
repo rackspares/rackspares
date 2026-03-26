@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import api from './api.jsx';
 import Navbar from './components/Navbar.jsx';
@@ -11,16 +11,54 @@ import CategoryManagement from './pages/CategoryManagement.jsx';
 import Reorder from './pages/Reorder.jsx';
 import BOMs from './pages/BOMs.jsx';
 import BOMDetail from './pages/BOMDetail.jsx';
+import NetboxSettings from './pages/NetboxSettings.jsx';
+import NetboxBrowse from './pages/NetboxBrowse.jsx';
+import CloneARack from './pages/CloneARack.jsx';
+import OpticCompatibility from './pages/OpticCompatibility.jsx';
+import UserPreferences from './pages/UserPreferences.jsx';
 
 export const AuthContext = createContext(null);
+export const ThemeContext = createContext({ theme: 'dark', accent: '#2563eb', setTheme: () => {}, setAccent: () => {} });
 
 export function useAuth() {
   return useContext(AuthContext);
 }
 
+export function useTheme() {
+  return useContext(ThemeContext);
+}
+
+function applyTheme(theme, accent) {
+  document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.style.setProperty('--color-accent', accent);
+  // Derive hover color (slightly darker)
+  document.documentElement.style.setProperty('--color-accent-hover', accent);
+  document.documentElement.style.setProperty(
+    '--color-accent-faint',
+    `${accent}26` // 15% opacity
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setThemeState] = useState(() => localStorage.getItem('rs-theme') || 'dark');
+  const [accent, setAccentState] = useState(() => localStorage.getItem('rs-accent') || '#2563eb');
+
+  // Apply theme immediately on mount and on changes
+  useEffect(() => {
+    applyTheme(theme, accent);
+  }, [theme, accent]);
+
+  const setTheme = useCallback((t) => {
+    setThemeState(t);
+    localStorage.setItem('rs-theme', t);
+  }, []);
+
+  const setAccent = useCallback((a) => {
+    setAccentState(a);
+    localStorage.setItem('rs-accent', a);
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -29,7 +67,16 @@ export default function App() {
       return;
     }
     api.get('/auth/me')
-      .then((res) => setUser(res.data))
+      .then((res) => {
+        setUser(res.data);
+        // Load preferences — failure here is non-fatal; keep defaults
+        api.get('/preferences/me')
+          .then((pref) => {
+            if (pref?.data?.theme) setTheme(pref.data.theme);
+            if (pref?.data?.accent_color) setAccent(pref.data.accent_color);
+          })
+          .catch(() => {});
+      })
       .catch(() => localStorage.removeItem('token'))
       .finally(() => setLoading(false));
   }, []);
@@ -43,64 +90,94 @@ export default function App() {
 
   return (
     <AuthContext.Provider value={{ user, setUser }}>
-      <BrowserRouter>
-        {user && <Navbar />}
-        <Routes>
-          <Route
-            path="/login"
-            element={user ? <Navigate to="/" replace /> : <Login />}
-          />
-          <Route
-            path="/"
-            element={user ? <Inventory /> : <Navigate to="/login" replace />}
-          />
-          <Route
-            path="/users"
-            element={
-              !user ? <Navigate to="/login" replace />
-              : isAdmin ? <UserManagement />
-              : <Navigate to="/" replace />
-            }
-          />
-          <Route
-            path="/audit"
-            element={
-              !user ? <Navigate to="/login" replace />
-              : isManagerOrAdmin ? <AuditLog />
-              : <Navigate to="/" replace />
-            }
-          />
-          <Route
-            path="/change-password"
-            element={user ? <ChangePassword /> : <Navigate to="/login" replace />}
-          />
-          <Route
-            path="/categories"
-            element={
-              !user ? <Navigate to="/login" replace />
-              : isAdmin ? <CategoryManagement />
-              : <Navigate to="/" replace />
-            }
-          />
-          <Route
-            path="/reorder"
-            element={
-              !user ? <Navigate to="/login" replace />
-              : isManagerOrAdmin ? <Reorder />
-              : <Navigate to="/" replace />
-            }
-          />
-          <Route
-            path="/boms"
-            element={user ? <BOMs /> : <Navigate to="/login" replace />}
-          />
-          <Route
-            path="/boms/:id"
-            element={user ? <BOMDetail /> : <Navigate to="/login" replace />}
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+      <ThemeContext.Provider value={{ theme, accent, setTheme, setAccent }}>
+        <BrowserRouter>
+          {user && <Navbar />}
+          <Routes>
+            <Route
+              path="/login"
+              element={user ? <Navigate to="/" replace /> : <Login />}
+            />
+            <Route
+              path="/"
+              element={user ? <Inventory /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/users"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isAdmin ? <UserManagement />
+                : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/audit"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isManagerOrAdmin ? <AuditLog />
+                : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/change-password"
+              element={user ? <ChangePassword /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/categories"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isAdmin ? <CategoryManagement />
+                : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/reorder"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isManagerOrAdmin ? <Reorder />
+                : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/boms"
+              element={user ? <BOMs /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/boms/:id"
+              element={user ? <BOMDetail /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/netbox"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isAdmin ? <NetboxSettings />
+                : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/netbox/browse"
+              element={user ? <NetboxBrowse /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/netbox/clone"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isManagerOrAdmin ? <CloneARack />
+                : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/optics"
+              element={user ? <OpticCompatibility /> : <Navigate to="/login" replace />}
+            />
+            <Route
+              path="/preferences"
+              element={user ? <UserPreferences /> : <Navigate to="/login" replace />}
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </ThemeContext.Provider>
     </AuthContext.Provider>
   );
 }

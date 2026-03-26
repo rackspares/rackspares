@@ -1,5 +1,10 @@
 version: '3.8'
 
+# ── Default stack: db + backend + frontend ────────────────────────────────────
+# Usage:
+#   docker compose up -d                          # standard stack
+#   docker compose --profile netbox up -d         # also start built-in Netbox
+
 services:
   db:
     image: postgres:15-alpine
@@ -22,8 +27,11 @@ services:
       SECRET_KEY: changeme-in-production
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
+      UPLOAD_DIR: /app/uploads
     ports:
       - "8000:8000"
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -36,5 +44,97 @@ services:
     depends_on:
       - backend
 
+  # ── Built-in Netbox (optional) ─────────────────────────────────────────────
+  # Start with: docker compose --profile netbox up -d
+  # Then configure the API URL in RackSpares → Netbox Settings:
+  #   URL:   http://netbox:8080  (internal Docker network)
+  #   Token: generate one in Netbox Admin → API Tokens
+  netbox-postgres:
+    image: postgres:15-alpine
+    profiles: ["netbox"]
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: netbox
+    volumes:
+      - netbox_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # Check that Postgres is ready AND the netbox database is accessible
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  netbox-redis:
+    image: redis:7-alpine
+    profiles: ["netbox"]
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  netbox:
+    image: netboxcommunity/netbox:latest
+    profiles: ["netbox"]
+    environment:
+      DB_HOST: netbox-postgres
+      DB_PORT: "5432"
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox
+      REDIS_HOST: netbox-redis
+      REDIS_PORT: "6379"
+      REDIS_CACHE_HOST: netbox-redis
+      REDIS_CACHE_PORT: "6379"
+      # SECRET_KEY must be 50+ characters for Django
+      SECRET_KEY: "netbox-rackspares-integration-secret-key-changeme-prod"
+      SUPERUSER_NAME: admin
+      SUPERUSER_EMAIL: admin@example.com
+      SUPERUSER_PASSWORD: admin
+      ALLOWED_HOSTS: "*"
+      SKIP_SUPERUSER: "false"
+    ports:
+      - "8080:8080"
+    volumes:
+      - netbox_media:/opt/netbox/netbox/media
+      - ./netbox-config/extra.py:/etc/netbox/config/extra.py:ro
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  netbox-worker:
+    image: netboxcommunity/netbox:latest
+    profiles: ["netbox"]
+    command: /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker
+    environment:
+      DB_HOST: netbox-postgres
+      DB_PORT: "5432"
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox
+      REDIS_HOST: netbox-redis
+      REDIS_PORT: "6379"
+      REDIS_CACHE_HOST: netbox-redis
+      REDIS_CACHE_PORT: "6379"
+      SECRET_KEY: "netbox-rackspares-integration-secret-key-changeme-prod"
+    volumes:
+      - ./netbox-config/extra.py:/etc/netbox/config/extra.py:ro
+    depends_on:
+      netbox:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  uploads_data:
+  netbox_postgres_data:
+  netbox_media:

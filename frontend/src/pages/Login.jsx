@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api.jsx';
 import { useAuth } from '../App.jsx';
@@ -8,8 +8,15 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState(null);
   const { setUser } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get('/preferences/company')
+      .then(res => setLogoUrl(res.data.logo_url || null))
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,7 +48,11 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-logo">
-          <div className="login-logo-icon">&#9881;</div>
+          {logoUrl ? (
+            <img src={logoUrl} alt="Company Logo" className="login-logo-img" />
+          ) : (
+            <div className="login-logo-icon">&#9881;</div>
+          )}
           <div className="login-logo-title">RackSpares</div>
           <div className="login-logo-subtitle">
             Data Center Warehouse Management
@@ -92,7 +103,7 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="login-footer">v0.3.0 &bull; Apache 2.0 Open Source</div>
+        <div className="login-footer">v0.4.0 &bull; Apache 2.0 Open Source</div>
       </div>
     </div>
   );

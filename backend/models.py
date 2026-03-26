@@ -5,6 +5,13 @@ from sqlalchemy.orm import relationship
 from database import Base
 
 
+# ── Enum helpers ──────────────────────────────────────────────────────────────
+
+class NetboxMode(str, enum.Enum):
+    external = "external"
+    builtin = "builtin"
+
+
 class ItemStatus(str, enum.Enum):
     available = "available"
     in_use = "in_use"
@@ -118,3 +125,117 @@ class BOMItem(Base):
 
     bom = relationship("BOM", back_populates="items")
     inventory_item = relationship("InventoryItem")
+
+
+# ── Netbox integration ────────────────────────────────────────────────────────
+
+class NetboxConfig(Base):
+    __tablename__ = "netbox_config"
+
+    id = Column(Integer, primary_key=True)
+    mode = Column(String(20), default="external", nullable=False)  # external | builtin
+    api_url = Column(String(500), nullable=True)
+    encrypted_token = Column(Text, nullable=True)
+    auto_sync_interval_minutes = Column(Integer, default=0, nullable=False)  # 0 = disabled
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
+    last_sync_status = Column(String(255), nullable=True)  # "ok" | "error: ..."
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class NetboxSite(Base):
+    __tablename__ = "netbox_sites"
+
+    id = Column(Integer, primary_key=True)
+    netbox_id = Column(Integer, nullable=False, unique=True)
+    name = Column(String(255), nullable=False)
+    slug = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    synced_at = Column(DateTime(timezone=True), default=utcnow)
+
+    racks = relationship("NetboxRack", back_populates="site", cascade="all, delete-orphan")
+
+
+class NetboxRack(Base):
+    __tablename__ = "netbox_racks"
+
+    id = Column(Integer, primary_key=True)
+    netbox_id = Column(Integer, nullable=False, unique=True)
+    name = Column(String(255), nullable=False)
+    site_id = Column(Integer, ForeignKey("netbox_sites.id", ondelete="CASCADE"), nullable=True)
+    location = Column(String(255), nullable=True)
+    u_height = Column(Integer, default=42)
+    description = Column(Text, nullable=True)
+    synced_at = Column(DateTime(timezone=True), default=utcnow)
+
+    site = relationship("NetboxSite", back_populates="racks")
+    devices = relationship("NetboxDevice", back_populates="rack", cascade="all, delete-orphan")
+
+
+class NetboxDeviceType(Base):
+    __tablename__ = "netbox_device_types"
+
+    id = Column(Integer, primary_key=True)
+    netbox_id = Column(Integer, nullable=False, unique=True)
+    manufacturer = Column(String(255), nullable=True)
+    model = Column(String(255), nullable=False)
+    slug = Column(String(255), nullable=True)
+    u_height = Column(Integer, default=1)
+    inventory_category_id = Column(Integer, ForeignKey("categories.id", ondelete="SET NULL"), nullable=True)
+    synced_at = Column(DateTime(timezone=True), default=utcnow)
+
+    inventory_category = relationship("Category")
+
+
+class NetboxDevice(Base):
+    __tablename__ = "netbox_devices"
+
+    id = Column(Integer, primary_key=True)
+    netbox_id = Column(Integer, nullable=False, unique=True)
+    name = Column(String(255), nullable=True)
+    rack_id = Column(Integer, ForeignKey("netbox_racks.id", ondelete="CASCADE"), nullable=True)
+    device_type_id = Column(Integer, ForeignKey("netbox_device_types.id", ondelete="SET NULL"), nullable=True)
+    role = Column(String(255), nullable=True)
+    position = Column(Integer, nullable=True)
+    face = Column(String(10), nullable=True)
+    synced_at = Column(DateTime(timezone=True), default=utcnow)
+
+    rack = relationship("NetboxRack", back_populates="devices")
+    device_type = relationship("NetboxDeviceType")
+
+
+# ── Optic compatibility ───────────────────────────────────────────────────────
+
+class OpticCompatibility(Base):
+    __tablename__ = "optic_compatibility"
+
+    id = Column(Integer, primary_key=True)
+    transceiver_model = Column(String(255), nullable=False, index=True)
+    compatible_platforms = Column(JSON, default=list)  # ["Cisco", "Arista", ...]
+    incompatible_platforms = Column(JSON, default=list)
+    notes = Column(Text, nullable=True)
+    compat_level = Column(String(20), default="unverified", nullable=False)  # confirmed|unverified|incompatible
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ── User preferences & theming ────────────────────────────────────────────────
+
+class UserPreferences(Base):
+    __tablename__ = "user_preferences"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    theme = Column(String(10), default="dark", nullable=False)  # dark | light | system
+    accent_color = Column(String(7), default="#2563eb", nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user = relationship("User")
+
+
+class CompanySettings(Base):
+    __tablename__ = "company_settings"
+
+    id = Column(Integer, primary_key=True)
+    logo_filename = Column(String(255), nullable=True)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

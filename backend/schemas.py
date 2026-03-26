@@ -205,3 +205,162 @@ class BOMOut(BaseModel):
     created_at: datetime
     status: BOMStatus
     items: List[BOMItemOut] = []
+
+
+# ── Netbox ─────────────────────────────────────────────────────────────────────
+
+class NetboxConfigOut(BaseModel):
+    id: int
+    mode: str
+    api_url: Optional[str] = None
+    has_token: bool = False
+    auto_sync_interval_minutes: int
+    last_sync_at: Optional[datetime] = None
+    last_sync_status: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class NetboxConfigUpdate(BaseModel):
+    mode: Optional[str] = None
+    api_url: Optional[str] = None
+    token: Optional[str] = None  # plaintext; encrypted on write
+    auto_sync_interval_minutes: Optional[int] = Field(default=None, ge=0)
+
+
+class NetboxSiteOut(BaseModel):
+    id: int
+    netbox_id: int
+    name: str
+    slug: str
+    description: Optional[str] = None
+    synced_at: Optional[datetime] = None
+    rack_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class NetboxRackOut(BaseModel):
+    id: int
+    netbox_id: int
+    name: str
+    site_id: Optional[int] = None
+    site_name: Optional[str] = None
+    location: Optional[str] = None
+    u_height: int
+    description: Optional[str] = None
+    device_count: int = 0
+
+    model_config = {"from_attributes": True}
+
+
+class NetboxDeviceTypeOut(BaseModel):
+    id: int
+    netbox_id: int
+    manufacturer: Optional[str] = None
+    model: str
+    slug: Optional[str] = None
+    u_height: int
+    inventory_category_id: Optional[int] = None
+    inventory_category_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class NetboxDeviceOut(BaseModel):
+    id: int
+    netbox_id: int
+    name: Optional[str] = None
+    rack_id: Optional[int] = None
+    device_type_id: Optional[int] = None
+    device_type_model: Optional[str] = None
+    device_type_manufacturer: Optional[str] = None
+    role: Optional[str] = None
+    position: Optional[int] = None
+    face: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class DeviceTypeMappingUpdate(BaseModel):
+    inventory_category_id: Optional[int] = None
+
+
+class CloneRackRequest(BaseModel):
+    netbox_rack_id: int
+    destination_site: Optional[str] = None
+    create_bom: bool = False
+    bom_name: Optional[str] = None
+
+
+class CloneRackLineItem(BaseModel):
+    device_type_model: str
+    device_type_manufacturer: Optional[str] = None
+    inventory_category_id: Optional[int] = None
+    inventory_category_name: Optional[str] = None
+    matched_inventory_item_id: Optional[int] = None
+    matched_inventory_item_name: Optional[str] = None
+    quantity_needed: int
+    quantity_in_stock: int
+    quantity_to_order: int
+    optic_flags: List[Dict[str, Any]] = []
+
+
+class CloneRackResult(BaseModel):
+    rack_name: str
+    site_name: Optional[str] = None
+    destination_site: Optional[str] = None
+    total_device_types: int
+    line_items: List[CloneRackLineItem]
+    bom_id: Optional[int] = None
+    bom_name: Optional[str] = None
+
+
+# ── Optic compatibility ────────────────────────────────────────────────────────
+
+class OpticCompatibilityOut(BaseModel):
+    id: int
+    transceiver_model: str
+    compatible_platforms: List[str] = []
+    incompatible_platforms: List[str] = []
+    notes: Optional[str] = None
+    compat_level: str
+    created_by: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class OpticCompatibilityCreate(BaseModel):
+    transceiver_model: str = Field(..., min_length=1, max_length=255)
+    compatible_platforms: List[str] = []
+    incompatible_platforms: List[str] = []
+    notes: Optional[str] = None
+    compat_level: str = "unverified"
+
+
+class OpticCompatibilityUpdate(BaseModel):
+    transceiver_model: Optional[str] = Field(default=None, min_length=1, max_length=255)
+    compatible_platforms: Optional[List[str]] = None
+    incompatible_platforms: Optional[List[str]] = None
+    notes: Optional[str] = None
+    compat_level: Optional[str] = None
+
+
+# ── User preferences ───────────────────────────────────────────────────────────
+
+class UserPreferencesOut(BaseModel):
+    theme: str
+    accent_color: str
+
+    model_config = {"from_attributes": True}
+
+
+class UserPreferencesUpdate(BaseModel):
+    theme: Optional[str] = None  # dark | light | system
+    accent_color: Optional[str] = None  # hex color
+
+
+class CompanySettingsOut(BaseModel):
+    logo_url: Optional[str] = None

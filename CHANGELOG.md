@@ -5,6 +5,69 @@ All notable changes to RackSpares will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-26
+
+### Added
+
+#### Netbox Integration
+- **Netbox connection settings** (Admin only) — configure External mode (point to existing Netbox via API URL + token) or Built-in mode (optionally launch a Netbox container via Docker Compose profile)
+- **Token encryption** — Netbox API token stored encrypted at rest using Fernet (AES-128-CBC) derived from `SECRET_KEY`
+- **Connection test** — verifies API access and reports the Netbox version
+- **Data sync** — pulls sites, racks, device types, and devices from Netbox into local tables; upserts on every sync
+- **Sync status indicator** — shows last successful sync time and last sync result (ok / error message)
+- **Manual sync button** plus configurable auto-sync interval (stored in config, displayed in UI)
+- **Netbox browser** — read-only tree view of synced sites → racks → devices; click any rack to inspect its device list
+- **Device-type category mapping** — Admin can map each Netbox device type to a RackSpares inventory category, used for inventory matching in Clone-a-Rack
+
+#### Clone-a-Rack
+- **Clone-a-Rack page** (Manager+) — select any synced Netbox rack and generate a full parts list
+- Parts list aggregates device types by count and attempts to match each to a RackSpares inventory item
+- **Three-column diff**: Needed / In Stock / To Order — clearly shows what's on the shelf vs. what must be ordered
+- **One-click BOM generation** — pre-populates a draft BOM with all shortfall items; links directly to the new BOM
+- Destination site/platform field provides context for optic compatibility checking
+- Clone-a-Rack and BOM-from-clone operations are logged to the audit log
+
+#### Optic Interoperability Flagging
+- **Optic compatibility table** — Admin can add/edit/delete transceiver model entries with compatible and incompatible platform lists and a free-text notes field
+- **Warning levels**: `confirmed` (green), `unverified` (amber), `incompatible` (red)
+- Clone-a-Rack automatically cross-references any transceiver-like device types against the compatibility table and flags incompatibilities inline in the parts list
+
+#### User Theme Customization
+- **Per-user theme preference** saved in `user_preferences` database table
+- Three theme options: **Light**, **Dark**, **System** (follows OS `prefers-color-scheme`)
+- **Accent color picker** with 9 preset swatches and a custom color input; affects buttons, focus rings, and interactive highlights across the entire UI
+- Theme changes apply immediately and persist across sessions via localStorage + API
+- Preferences page accessible from the navbar (&#9680; icon)
+- **Company logo upload** (Admin only) — PNG, JPEG, GIF, SVG, or WebP; replaces the gear icon on the navbar and login page; stored in a Docker volume
+- All UI styles converted to CSS custom properties (`var(--color-*)`) for full theme support
+
+#### Audit Log Entries (new event types)
+- `entity_type = "netbox_sync"` — logged on every manual or automatic Netbox sync with stats (sites/racks/device_types/devices counts)
+- `entity_type = "clone_rack"` — logged for every Clone-a-Rack operation with source rack and destination site
+- `entity_type = "bom"` — BOM creation via Clone-a-Rack is tagged with `source: clone_rack` in the changes JSON
+
+#### Infrastructure
+- `uploads_data` Docker volume for company logo storage
+- Optional Netbox containers available via `docker compose --profile netbox up -d` (Netbox, Postgres, Redis, background worker)
+- New database tables: `netbox_config`, `netbox_sites`, `netbox_racks`, `netbox_device_types`, `netbox_devices`, `optic_compatibility`, `user_preferences`, `company_settings`
+- New API routes: `/api/netbox/`, `/api/optics/`, `/api/preferences/`
+- Added `httpx` and `aiofiles` to Python dependencies
+
+### Changed
+- Navbar updated: Netbox, Clone Rack, Optics, NB Settings, and Preferences (&#9680;) links added; version tag updated to v0.4.0
+- Login page shows company logo when configured
+- CSS entirely refactored to CSS custom properties for theme support; dark theme is a first-class option (no longer just a dark navbar)
+
+### Migration note
+> v0.4.0 adds eight new tables and a new Docker volume. The startup migration is **idempotent** — simply rebuild and restart:
+> ```
+> docker compose up --build -d
+> ```
+> To use the built-in Netbox option:
+> ```
+> docker compose --profile netbox up --build -d
+> ```
+
 ## [0.3.0] - 2026-03-26
 
 ### Added

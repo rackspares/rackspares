@@ -11,6 +11,9 @@ from routers import auth, inventory
 from routers.audit import router as audit_router
 from routers.categories import router as categories_router
 from routers.boms import router as boms_router
+from routers.netbox import router as netbox_router
+from routers.optics import router as optics_router
+from routers.preferences import router as preferences_router
 from routers.auth import hash_password
 
 DEFAULT_CATEGORIES = [
@@ -27,7 +30,7 @@ DEFAULT_CATEGORIES = [
 
 def run_migrations():
     """
-    Idempotent schema migrations for v0.2.0 and v0.3.0.
+    Idempotent schema migrations for v0.2.0, v0.3.0, and v0.4.0.
     Adds new columns/tables to existing database without recreation.
     """
     insp = inspect(engine)
@@ -134,12 +137,10 @@ def run_migrations():
                 print("[rackspares] migration: added inventory_items.lead_time_days")
 
             if "category_id" not in inv_cols and "category" in inv_cols:
-                # Add FK column, migrate text categories → category rows, drop old column
                 conn.execute(text(
                     "ALTER TABLE inventory_items"
                     " ADD COLUMN category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT"
                 ))
-                # For each distinct old category name, insert a category row and update FKs
                 rows = conn.execute(text(
                     "SELECT DISTINCT category FROM inventory_items WHERE category IS NOT NULL AND category != ''"
                 )).fetchall()
@@ -162,6 +163,129 @@ def run_migrations():
                     " ADD COLUMN category_id INTEGER REFERENCES categories(id) ON DELETE RESTRICT"
                 ))
                 print("[rackspares] migration: added inventory_items.category_id")
+
+        # ── v0.4.0: netbox_config ─────────────────────────────────────────────
+        if "netbox_config" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE netbox_config (
+                    id SERIAL PRIMARY KEY,
+                    mode VARCHAR(20) NOT NULL DEFAULT 'external',
+                    api_url VARCHAR(500),
+                    encrypted_token TEXT,
+                    auto_sync_interval_minutes INTEGER NOT NULL DEFAULT 0,
+                    last_sync_at TIMESTAMP WITH TIME ZONE,
+                    last_sync_status VARCHAR(255),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created netbox_config table")
+
+        # ── v0.4.0: netbox_sites ──────────────────────────────────────────────
+        if "netbox_sites" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE netbox_sites (
+                    id SERIAL PRIMARY KEY,
+                    netbox_id INTEGER NOT NULL UNIQUE,
+                    name VARCHAR(255) NOT NULL,
+                    slug VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created netbox_sites table")
+
+        # ── v0.4.0: netbox_racks ──────────────────────────────────────────────
+        if "netbox_racks" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE netbox_racks (
+                    id SERIAL PRIMARY KEY,
+                    netbox_id INTEGER NOT NULL UNIQUE,
+                    name VARCHAR(255) NOT NULL,
+                    site_id INTEGER REFERENCES netbox_sites(id) ON DELETE CASCADE,
+                    location VARCHAR(255),
+                    u_height INTEGER DEFAULT 42,
+                    description TEXT,
+                    synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created netbox_racks table")
+
+        # ── v0.4.0: netbox_device_types ───────────────────────────────────────
+        if "netbox_device_types" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE netbox_device_types (
+                    id SERIAL PRIMARY KEY,
+                    netbox_id INTEGER NOT NULL UNIQUE,
+                    manufacturer VARCHAR(255),
+                    model VARCHAR(255) NOT NULL,
+                    slug VARCHAR(255),
+                    u_height INTEGER DEFAULT 1,
+                    inventory_category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                    synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created netbox_device_types table")
+
+        # ── v0.4.0: netbox_devices ────────────────────────────────────────────
+        if "netbox_devices" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE netbox_devices (
+                    id SERIAL PRIMARY KEY,
+                    netbox_id INTEGER NOT NULL UNIQUE,
+                    name VARCHAR(255),
+                    rack_id INTEGER REFERENCES netbox_racks(id) ON DELETE CASCADE,
+                    device_type_id INTEGER REFERENCES netbox_device_types(id) ON DELETE SET NULL,
+                    role VARCHAR(255),
+                    position INTEGER,
+                    face VARCHAR(10),
+                    synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created netbox_devices table")
+
+        # ── v0.4.0: optic_compatibility ───────────────────────────────────────
+        if "optic_compatibility" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE optic_compatibility (
+                    id SERIAL PRIMARY KEY,
+                    transceiver_model VARCHAR(255) NOT NULL,
+                    compatible_platforms JSONB DEFAULT '[]',
+                    incompatible_platforms JSONB DEFAULT '[]',
+                    notes TEXT,
+                    compat_level VARCHAR(20) NOT NULL DEFAULT 'unverified',
+                    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            conn.execute(text(
+                "CREATE INDEX ix_optic_compatibility_model ON optic_compatibility(transceiver_model)"
+            ))
+            print("[rackspares] migration: created optic_compatibility table")
+
+        # ── v0.4.0: user_preferences ──────────────────────────────────────────
+        if "user_preferences" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE user_preferences (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+                    theme VARCHAR(10) NOT NULL DEFAULT 'dark',
+                    accent_color VARCHAR(7) NOT NULL DEFAULT '#2563eb',
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created user_preferences table")
+
+        # ── v0.4.0: company_settings ──────────────────────────────────────────
+        if "company_settings" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE company_settings (
+                    id SERIAL PRIMARY KEY,
+                    logo_filename VARCHAR(255),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created company_settings table")
 
 
 @asynccontextmanager
@@ -200,7 +324,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="RackSpares API", version="0.3.0", lifespan=lifespan)
+app = FastAPI(title="RackSpares API", version="0.4.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -215,8 +339,11 @@ app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"]
 app.include_router(audit_router, prefix="/api/audit", tags=["audit"])
 app.include_router(categories_router, prefix="/api/categories", tags=["categories"])
 app.include_router(boms_router, prefix="/api/boms", tags=["boms"])
+app.include_router(netbox_router, prefix="/api/netbox", tags=["netbox"])
+app.include_router(optics_router, prefix="/api/optics", tags=["optics"])
+app.include_router(preferences_router, prefix="/api/preferences", tags=["preferences"])
 
 
 @app.get("/api/health", tags=["health"])
 def health():
-    return {"status": "ok", "version": "0.3.0"}
+    return {"status": "ok", "version": "0.4.0"}
