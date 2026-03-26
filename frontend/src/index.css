@@ -277,6 +277,83 @@ body {
   margin: 6px 0;
 }
 
+/* ── Admin Ticker ────────────────────────────────────────── */
+.ticker-bar {
+  background: #060a10;
+  border-bottom: 1px solid #1a2234;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  user-select: none;
+}
+
+.ticker-label {
+  flex-shrink: 0;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 0 10px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid rgba(255,255,255,0.1);
+  text-transform: uppercase;
+}
+
+.ticker-track-wrapper {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-33.333%); }
+}
+
+.ticker-track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  animation: ticker-scroll 40s linear infinite;
+  gap: 0;
+}
+
+.ticker-track:hover {
+  animation-play-state: paused;
+}
+
+.ticker-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 20px;
+  border-right: 1px solid #1a2234;
+  white-space: nowrap;
+  height: 30px;
+}
+
+.ticker-key {
+  font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #3d5275;
+  text-transform: uppercase;
+}
+
+.ticker-val {
+  font-family: 'SF Mono', 'Fira Mono', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7da7d9;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Page layout ─────────────────────────────────────────── */
 .main-content {
   max-width: 1400px;

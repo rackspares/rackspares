@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import api from './api.jsx';
 import Navbar from './components/Navbar.jsx';
+import AdminTicker from './components/AdminTicker.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Login from './pages/Login.jsx';
 import UserManagement from './pages/UserManagement.jsx';
@@ -93,6 +94,7 @@ export default function App() {
       <ThemeContext.Provider value={{ theme, accent, setTheme, setAccent }}>
         <BrowserRouter>
           {user && <Navbar />}
+          {user && <AdminTicker />}
           <Routes>
             <Route
               path="/login"

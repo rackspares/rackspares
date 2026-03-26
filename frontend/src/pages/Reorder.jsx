@@ -13,35 +13,8 @@ export default function Reorder() {
       .finally(() => setLoading(false));
   }, []);
 
-  const criticalCount = alerts.filter((a) => a.urgency === 'critical').length;
-  const warningCount  = alerts.filter((a) => a.urgency === 'warning').length;
-
   return (
     <main className="main-content">
-      <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-label">Total Alerts</div>
-          <div className="stat-value" style={{ color: alerts.length > 0 ? '#dc2626' : '#0f172a' }}>
-            {alerts.length}
-          </div>
-          <div className="stat-sub">below minimum</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Critical</div>
-          <div className="stat-value" style={{ color: criticalCount > 0 ? '#dc2626' : '#0f172a' }}>
-            {criticalCount}
-          </div>
-          <div className="stat-sub">zero stock</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Warning</div>
-          <div className="stat-value" style={{ color: warningCount > 0 ? '#d97706' : '#0f172a' }}>
-            {warningCount}
-          </div>
-          <div className="stat-sub">low stock</div>
-        </div>
-      </div>
-
       <div className="page-header">
         <div>
           <h1 className="page-title">Reorder Alerts</h1>

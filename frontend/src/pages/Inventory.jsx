@@ -187,48 +187,10 @@ export default function Inventory() {
 
   const isFiltered = search || categoryFilter || itemTypeFilter || statusFilter || staleFilter;
 
-  const totalQty       = items.reduce((s, i) => s + i.quantity, 0);
-  const availableCount = items.filter((i) => i.status === 'available').length;
-  const faultyCount    = items.filter((i) => i.status === 'faulty').length;
-  const staleCount     = items.filter((i) => staleness(i.last_verified) !== null).length;
-
   const categoryTree = buildCategoryTree(categories);
 
   return (
     <main className="main-content">
-      {/* Stats */}
-      <div className="stats-row">
-        <div className="stat-card">
-          <div className="stat-label">Items</div>
-          <div className="stat-value">{items.length}</div>
-          <div className="stat-sub">unique SKUs</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Total Qty</div>
-          <div className="stat-value">{totalQty}</div>
-          <div className="stat-sub">units on hand</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Available</div>
-          <div className="stat-value" style={{ color: '#16a34a' }}>{availableCount}</div>
-          <div className="stat-sub">ready to use</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Faulty</div>
-          <div className="stat-value" style={{ color: faultyCount > 0 ? '#dc2626' : '#0f172a' }}>
-            {faultyCount}
-          </div>
-          <div className="stat-sub">need attention</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label">Stale</div>
-          <div className="stat-value" style={{ color: staleCount > 0 ? '#d97706' : '#0f172a' }}>
-            {staleCount}
-          </div>
-          <div className="stat-sub">unverified 30d+</div>
-        </div>
-      </div>
-
       {/* Page header */}
       <div className="page-header">
         <div>
