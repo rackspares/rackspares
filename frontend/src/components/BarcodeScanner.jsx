@@ -46,6 +46,17 @@ export default function BarcodeScanner({ onScan, onError }) {
     let cancelled = false;
 
     async function start() {
+      // ── check secure context ─────────────────────────────────────────────────
+      if (!navigator.mediaDevices?.getUserMedia) {
+        const isHttp = location.protocol === 'http:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1';
+        const msg = isHttp
+          ? 'Camera access requires HTTPS. Please open this page over a secure connection.'
+          : 'Camera API not available in this browser.';
+        setPermError(msg);
+        onError?.(msg);
+        return;
+      }
+
       // ── request camera ──────────────────────────────────────────────────────
       let stream;
       try {
