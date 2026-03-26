@@ -106,6 +106,7 @@ class InventoryItemCreate(BaseModel):
     location: Optional[str] = Field(default=None, max_length=255)
     status: ItemStatus = ItemStatus.available
     description: Optional[str] = None
+    serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
     lead_time_days: Optional[int] = Field(default=None, ge=0)
 
@@ -118,6 +119,7 @@ class InventoryItemUpdate(BaseModel):
     location: Optional[str] = Field(default=None, max_length=255)
     status: Optional[ItemStatus] = None
     description: Optional[str] = None
+    serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
     lead_time_days: Optional[int] = Field(default=None, ge=0)
 
@@ -132,6 +134,7 @@ class InventoryItemOut(BaseModel):
     location: Optional[str]
     status: ItemStatus
     description: Optional[str]
+    serial_number: Optional[str] = None
     minimum_stock: Optional[int] = None
     lead_time_days: Optional[int] = None
     date_added: datetime
@@ -139,6 +142,11 @@ class InventoryItemOut(BaseModel):
     last_verified: Optional[datetime]
 
     model_config = {"from_attributes": True}
+
+
+class BulkReceiveResult(BaseModel):
+    count: int
+    items: List["InventoryItemOut"]
 
 
 class ReorderAlertOut(InventoryItemOut):

@@ -9,6 +9,7 @@ const STATUS_OPTIONS = [
 
 const EMPTY = {
   name: '',
+  serial_number: '',
   category_id: '',
   item_type: 'asset',
   quantity: 1,
@@ -54,6 +55,7 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
     if (item) {
       setForm({
         name:           item.name           ?? '',
+        serial_number:  item.serial_number  ?? '',
         category_id:    item.category_id    ?? '',
         item_type:      item.item_type      ?? 'asset',
         quantity:       item.quantity       ?? 0,
@@ -96,6 +98,7 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
       ...form,
       quantity:       Number(form.quantity),
       category_id:    form.category_id !== '' ? Number(form.category_id) : null,
+      serial_number:  form.serial_number.trim() || null,
       minimum_stock:  form.minimum_stock !== '' ? Number(form.minimum_stock) : null,
       lead_time_days: form.lead_time_days !== '' ? Number(form.lead_time_days) : null,
     };
@@ -129,6 +132,17 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
                   autoFocus
                 />
                 {errors.name && <div className="form-error">{errors.name}</div>}
+              </div>
+
+              {/* Serial Number */}
+              <div className="form-group form-col-span">
+                <label className="form-label">Serial Number</label>
+                <input
+                  className="form-input"
+                  value={form.serial_number}
+                  onChange={(e) => set('serial_number', e.target.value)}
+                  placeholder="e.g. SN-ABC123 (optional, must be unique)"
+                />
               </div>
 
               {/* Item Type */}

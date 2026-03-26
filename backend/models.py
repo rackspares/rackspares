@@ -79,6 +79,7 @@ class InventoryItem(Base):
     lead_time_days = Column(Integer, nullable=True)
     location = Column(String(255))
     status = Column(Enum(ItemStatus), default=ItemStatus.available, nullable=False)
+    serial_number = Column(String(255), nullable=True, unique=True)
     description = Column(Text)
     date_added = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     last_updated = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)

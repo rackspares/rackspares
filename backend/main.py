@@ -287,6 +287,16 @@ def run_migrations():
             """))
             print("[rackspares] migration: created company_settings table")
 
+        # ── v0.5.0: inventory_items.serial_number ─────────────────────────────
+        if "inventory_items" in existing_tables:
+            inv_cols = {c["name"] for c in insp.get_columns("inventory_items")}
+            if "serial_number" not in inv_cols:
+                conn.execute(text(
+                    "ALTER TABLE inventory_items"
+                    " ADD COLUMN serial_number VARCHAR(255) UNIQUE"
+                ))
+                print("[rackspares] migration: added inventory_items.serial_number")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

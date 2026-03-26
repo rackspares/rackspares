@@ -33,6 +33,7 @@ def _item_snapshot(item: models.InventoryItem) -> dict:
         "lead_time_days": item.lead_time_days,
         "location": item.location,
         "status": _serialize(item.status),
+        "serial_number": item.serial_number,
         "description": item.description,
         "last_verified": _serialize(item.last_verified),
     }
@@ -89,6 +90,7 @@ def list_items(
                 models.InventoryItem.name.ilike(term),
                 models.InventoryItem.description.ilike(term),
                 models.InventoryItem.location.ilike(term),
+                models.InventoryItem.serial_number.ilike(term),
             )
         )
     if category_id is not None:
@@ -189,6 +191,16 @@ def create_item(
         if not db.query(models.Category).filter(models.Category.id == item.category_id).first():
             raise HTTPException(status_code=404, detail="Category not found")
 
+    if item.serial_number:
+        conflict = db.query(models.InventoryItem).filter(
+            models.InventoryItem.serial_number == item.serial_number
+        ).first()
+        if conflict:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Serial number '{item.serial_number}' is already assigned to '{conflict.name}'",
+            )
+
     db_item = models.InventoryItem(**item.model_dump())
     db.add(db_item)
     db.flush()
@@ -225,6 +237,17 @@ def update_item(
     if "category_id" in updates and updates["category_id"] is not None:
         if not db.query(models.Category).filter(models.Category.id == updates["category_id"]).first():
             raise HTTPException(status_code=404, detail="Category not found")
+
+    if updates.get("serial_number"):
+        conflict = db.query(models.InventoryItem).filter(
+            models.InventoryItem.serial_number == updates["serial_number"],
+            models.InventoryItem.id != item_id,
+        ).first()
+        if conflict:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Serial number '{updates['serial_number']}' is already assigned to '{conflict.name}'",
+            )
 
     before = _item_snapshot(item)
     for field, value in updates.items():
