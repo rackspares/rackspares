@@ -1755,3 +1755,90 @@ tbody tr:hover td {
   }
   .receive-confirm-btn { min-width: unset; }
 }
+
+/* ── Bulk receive: mode toggle & staging list ──────────────── */
+
+.receive-mode-toggle {
+  display: flex;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.receive-mode-btn {
+  background: var(--color-surface-2);
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  transition: background 0.15s, color 0.15s;
+}
+.receive-mode-btn:first-child { border-right: 1px solid var(--color-border); }
+.receive-mode-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+}
+.receive-mode-btn:hover:not(.active) {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.staging-bar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.staging-count {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.staging-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.staging-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.staging-item-name { flex: 1; font-weight: 500; color: var(--color-text); }
+.staging-item-sn   { color: var(--color-text-muted); font-size: 12px; }
+.staging-item-qty  { font-weight: 700; color: var(--color-accent); min-width: 28px; text-align: right; }
+.staging-item-remove {
+  background: none;
+  border: none;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+}
+.staging-item-remove:hover { color: var(--color-danger); background: var(--color-danger-bg); }
+
+.staging-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 4px;
+}

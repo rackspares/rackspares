@@ -210,6 +210,51 @@ def create_item(
     return db_item
 
 
+@router.post("/bulk", response_model=schemas.BulkReceiveResult, status_code=201)
+def bulk_receive(
+    items: List[schemas.InventoryItemCreate],
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_manager_or_admin),
+):
+    """
+    Create or update multiple inventory items in a single transaction.
+    If an item has a serial_number that already exists, its quantity is
+    incremented rather than raising a conflict error.
+    """
+    saved = []
+    for item in items:
+        if item.category_id is not None:
+            if not db.query(models.Category).filter(models.Category.id == item.category_id).first():
+                raise HTTPException(status_code=404, detail=f"Category {item.category_id} not found")
+
+        if item.serial_number:
+            existing = db.query(models.InventoryItem).filter(
+                models.InventoryItem.serial_number == item.serial_number
+            ).first()
+            if existing:
+                before = _item_snapshot(existing)
+                existing.quantity += item.quantity
+                existing.last_updated = datetime.now(timezone.utc)
+                after = _item_snapshot(existing)
+                diff = {k: {"old": before[k], "new": after[k]} for k in after if before.get(k) != after.get(k)}
+                _write_audit(db, current_user, models.AuditAction.update, existing, diff or None)
+                db.flush()
+                saved.append(existing)
+                continue
+
+        db_item = models.InventoryItem(**item.model_dump())
+        db.add(db_item)
+        db.flush()
+        _write_audit(db, current_user, models.AuditAction.create, db_item, _item_snapshot(db_item))
+        saved.append(db_item)
+
+    db.commit()
+    for it in saved:
+        db.refresh(it)
+
+    return schemas.BulkReceiveResult(count=len(saved), items=saved)
+
+
 @router.get("/{item_id}", response_model=schemas.InventoryItemOut)
 def get_item(
     item_id: int,
