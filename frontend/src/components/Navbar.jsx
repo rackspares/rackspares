@@ -1,17 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../App.jsx';
 import api from '../api.jsx';
 
-const ROLE_BADGE = {
-  admin:   { label: 'admin',   cls: 'navbar-role-badge admin' },
-  manager: { label: 'manager', cls: 'navbar-role-badge manager' },
-  viewer:  { label: 'viewer',  cls: 'navbar-role-badge viewer' },
-};
-
 export default function Navbar() {
   const { user, setUser } = useAuth();
+  const navigate = useNavigate();
   const [logoUrl, setLogoUrl] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
 
   useEffect(() => {
     api.get('/preferences/company')
@@ -19,15 +16,33 @@ export default function Navbar() {
       .catch(() => {});
   }, []);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     setUser(null);
+    setMenuOpen(false);
+  };
+
+  const handleNav = (path) => {
+    navigate(path);
+    setMenuOpen(false);
   };
 
   const role = user?.role;
-  const badge = ROLE_BADGE[role];
   const isAdmin = role === 'admin';
   const isManagerOrAdmin = role === 'admin' || role === 'manager';
+
+  const initial = user?.username?.[0]?.toUpperCase() || '?';
 
   return (
     <nav className="navbar">
@@ -39,7 +54,7 @@ export default function Navbar() {
           }
         </div>
         RackSpares
-        <span className="version-tag">v0.4.0</span>
+        <span className="version-tag">v0.4.1</span>
       </div>
 
       <div className="navbar-nav">
@@ -118,29 +133,45 @@ export default function Navbar() {
         )}
       </div>
 
-      <div className="navbar-right">
-        <span className="navbar-user">
-          {user?.username}
-          {badge && <span className={badge.cls}>{badge.label}</span>}
-        </span>
-        <NavLink
-          to="/preferences"
-          className={({ isActive }) => `btn-logout${isActive ? ' active' : ''}`}
-          style={{ textDecoration: 'none', fontSize: 13 }}
-          title="Theme & Preferences"
+      <div className="navbar-right" ref={menuRef}>
+        <button
+          className="user-menu-trigger"
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-expanded={menuOpen}
+          aria-haspopup="true"
         >
-          &#9680;
-        </NavLink>
-        <NavLink
-          to="/change-password"
-          className={({ isActive }) => `btn-logout${isActive ? ' active' : ''}`}
-          style={{ textDecoration: 'none', fontSize: 13 }}
-        >
-          Password
-        </NavLink>
-        <button className="btn-logout" onClick={handleLogout}>
-          Sign out
+          <span className="user-avatar">{initial}</span>
+          <span className="user-menu-name">{user?.username}</span>
+          <span className="user-role-pill" data-role={role}>{role}</span>
+          <span className="user-menu-caret" aria-hidden="true">&#9660;</span>
         </button>
+
+        {menuOpen && (
+          <div className="user-dropdown" role="menu">
+            <button
+              className="user-dropdown-item"
+              role="menuitem"
+              onClick={() => handleNav('/preferences')}
+            >
+              Account Settings
+            </button>
+            <button
+              className="user-dropdown-item"
+              role="menuitem"
+              onClick={() => handleNav('/change-password')}
+            >
+              Change Password
+            </button>
+            <div className="user-dropdown-divider" />
+            <button
+              className="user-dropdown-item danger"
+              role="menuitem"
+              onClick={handleLogout}
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
       </div>
     </nav>
   );
