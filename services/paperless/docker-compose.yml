@@ -1,0 +1,77 @@
+# Paperless-ngx — managed by RackSpares Setup Wizard
+# Deployed via: docker compose -f services/paperless/docker-compose.yml up -d
+#
+# Web UI:  http://localhost:8200
+# Admin:   username: admin  password: admin
+#
+# To generate an API token for RackSpares integration:
+#   1. Log into Paperless at http://localhost:8200
+#   2. Go to Settings → API Auth Tokens → Create token
+#   3. Enter the token in RackSpares → Services → Paperless
+#
+# Change all passwords and SECRET_KEY before exposing to a network.
+
+name: rackspares-paperless
+
+services:
+  paperless-webserver:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: rackspares-paperless
+    depends_on:
+      paperless-redis:
+        condition: service_started
+      paperless-db:
+        condition: service_healthy
+    ports:
+      - "8200:8000"
+    environment:
+      PAPERLESS_REDIS: redis://paperless-redis:6379
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_DBHOST: paperless-db
+      PAPERLESS_DBNAME: paperless
+      PAPERLESS_DBUSER: paperless
+      PAPERLESS_DBPASS: paperless-secret-change-me
+      PAPERLESS_SECRET_KEY: rackspares-paperless-secret-change-me-in-production
+      PAPERLESS_ADMIN_USER: admin
+      PAPERLESS_ADMIN_PASSWORD: admin
+      PAPERLESS_ADMIN_MAIL: admin@example.com
+      PAPERLESS_URL: http://localhost:8200
+      PAPERLESS_TIME_ZONE: UTC
+    volumes:
+      - rackspares_paperless_data:/usr/src/paperless/data
+      - rackspares_paperless_media:/usr/src/paperless/media
+      - rackspares_paperless_export:/usr/src/paperless/export
+      - rackspares_paperless_consume:/usr/src/paperless/consume
+    restart: unless-stopped
+
+  paperless-redis:
+    image: redis:7-alpine
+    container_name: rackspares-paperless-redis
+    volumes:
+      - rackspares_paperless_redis:/data
+    restart: unless-stopped
+
+  paperless-db:
+    image: postgres:15-alpine
+    container_name: rackspares-paperless-postgres
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless-secret-change-me
+    volumes:
+      - rackspares_paperless_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperless -d paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  rackspares_paperless_data:
+  rackspares_paperless_media:
+  rackspares_paperless_export:
+  rackspares_paperless_consume:
+  rackspares_paperless_redis:
+  rackspares_paperless_pg:

@@ -1,0 +1,97 @@
+# NetBox Community Edition — managed by RackSpares Setup Wizard
+# Deployed via: docker compose -f services/netbox/docker-compose.yml up -d
+#
+# Web UI:   http://localhost:8100
+# Admin:    username: admin  password: admin
+# API token pre-created: 0123456789abcdef0123456789abcdef01234567
+#
+# Change all passwords and the SECRET_KEY before exposing to a network.
+
+name: rackspares-netbox
+
+services:
+  netbox:
+    image: netboxcommunity/netbox:latest
+    container_name: rackspares-netbox
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_healthy
+    environment:
+      DB_HOST: netbox-postgres
+      DB_PORT: "5432"
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox-secret-change-me
+      REDIS_HOST: netbox-redis
+      REDIS_PORT: "6379"
+      REDIS_CACHE_HOST: netbox-redis
+      REDIS_CACHE_PORT: "6379"
+      SECRET_KEY: "rackspares-netbox-secret-key-minimum-fifty-chars-change-me-prod"
+      SUPERUSER_NAME: admin
+      SUPERUSER_EMAIL: admin@example.com
+      SUPERUSER_PASSWORD: admin
+      SUPERUSER_API_TOKEN: "0123456789abcdef0123456789abcdef01234567"
+      ALLOWED_HOSTS: "*"
+      SKIP_SUPERUSER: "false"
+    ports:
+      - "8100:8080"
+    volumes:
+      - rackspares_netbox_media:/opt/netbox/netbox/media
+    restart: unless-stopped
+
+  netbox-worker:
+    image: netboxcommunity/netbox:latest
+    container_name: rackspares-netbox-worker
+    command: /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker
+    depends_on:
+      netbox:
+        condition: service_started
+    environment:
+      DB_HOST: netbox-postgres
+      DB_PORT: "5432"
+      DB_NAME: netbox
+      DB_USER: netbox
+      DB_PASSWORD: netbox-secret-change-me
+      REDIS_HOST: netbox-redis
+      REDIS_PORT: "6379"
+      REDIS_CACHE_HOST: netbox-redis
+      REDIS_CACHE_PORT: "6379"
+      SECRET_KEY: "rackspares-netbox-secret-key-minimum-fifty-chars-change-me-prod"
+    restart: unless-stopped
+
+  netbox-postgres:
+    image: postgres:15-alpine
+    container_name: rackspares-netbox-postgres
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: netbox-secret-change-me
+    volumes:
+      - rackspares_netbox_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 20s
+    restart: unless-stopped
+
+  netbox-redis:
+    image: redis:7-alpine
+    container_name: rackspares-netbox-redis
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    volumes:
+      - rackspares_netbox_redis:/data
+
+volumes:
+  rackspares_netbox_media:
+  rackspares_netbox_pg:
+  rackspares_netbox_redis:
