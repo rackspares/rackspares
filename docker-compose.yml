@@ -32,6 +32,12 @@ services:
       - "8000:8000"
     volumes:
       - uploads_data:/app/uploads
+      # Mount compose files so the backend can deploy optional services via the wizard
+      - ./services:/services:ro
+      # Docker socket — required for `docker compose up` in the Setup Wizard.
+      # This grants the backend container access to the host Docker daemon.
+      # Remove this mount if you do not need the wizard's "Spin one up" feature.
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
         condition: service_healthy

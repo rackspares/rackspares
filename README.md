@@ -52,6 +52,46 @@ Then open [http://localhost:3000](http://localhost:3000) and log in:
 
 ---
 
+## Optional Services
+
+RackSpares can connect to or automatically deploy three optional services via the **Setup Wizard** (shown automatically on first admin login, or re-accessible via Admin → Services).
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| [NetBox](https://netbox.dev) | 8100 | Network documentation & DCIM — rack layouts, device inventory |
+| [Paperless-ngx](https://docs.paperless-ngx.com) | 8200 | Document management — receipts, warranties, datasheets |
+| [n8n](https://n8n.io) | 5678 | Workflow automation — reorder alerts, Slack/email notifications |
+
+Each service can be connected to an existing instance (URL + API key) or deployed fresh from a bundled Docker Compose file.
+
+### Docker Socket Access
+
+The "Spin one up for me" deploy feature requires the backend container to communicate with the host Docker daemon. This is achieved by mounting the Docker socket:
+
+```yaml
+# docker-compose.yml (already configured)
+backend:
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+```
+
+**Security note:** Mounting the Docker socket grants the backend root-equivalent access to the host. This is acceptable for a self-hosted tool on a trusted server, but remove the mount if you do not need the deploy feature and want a reduced attack surface.
+
+### Manually deploying a service
+
+```bash
+# NetBox
+docker compose -f services/netbox/docker-compose.yml up -d
+
+# Paperless-ngx
+docker compose -f services/paperless/docker-compose.yml up -d
+
+# n8n
+docker compose -f services/n8n/docker-compose.yml up -d
+```
+
+---
+
 ## Project Structure
 
 ```
