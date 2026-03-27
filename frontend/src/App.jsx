@@ -18,6 +18,8 @@ import CloneARack from './pages/CloneARack.jsx';
 import OpticCompatibility from './pages/OpticCompatibility.jsx';
 import UserPreferences from './pages/UserPreferences.jsx';
 import ReceiveShipment from './pages/ReceiveShipment.jsx';
+import SetupWizard from './pages/SetupWizard.jsx';
+import ServicesAdmin from './pages/ServicesAdmin.jsx';
 
 export const AuthContext = createContext(null);
 export const ThemeContext = createContext({ theme: 'dark', accent: '#2563eb', setTheme: () => {}, setAccent: () => {} });
@@ -44,6 +46,7 @@ function applyTheme(theme, accent) {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showWizard, setShowWizard] = useState(false);
   const [theme, setThemeState] = useState(() => localStorage.getItem('rs-theme') || 'dark');
   const [accent, setAccentState] = useState(() => localStorage.getItem('rs-accent') || '#2563eb');
 
@@ -78,6 +81,12 @@ export default function App() {
             if (pref?.data?.accent_color) setAccent(pref.data.accent_color);
           })
           .catch(() => {});
+        // Check setup wizard for admins — fail silently, never block the app
+        if (res.data.role === 'admin') {
+          api.get('/services/wizard-status')
+            .then((ws) => { if (!ws.data.completed) setShowWizard(true); })
+            .catch(() => {});
+        }
       })
       .catch(() => localStorage.removeItem('token'))
       .finally(() => setLoading(false));
@@ -96,6 +105,9 @@ export default function App() {
         <BrowserRouter>
           {user && <Navbar />}
           {user && <AdminTicker />}
+          {user && showWizard && (
+            <SetupWizard onComplete={() => setShowWizard(false)} />
+          )}
           <Routes>
             <Route
               path="/login"
@@ -182,6 +194,14 @@ export default function App() {
               element={
                 !user ? <Navigate to="/login" replace />
                 : isManagerOrAdmin ? <ReceiveShipment />
+                : <Navigate to="/" replace />
+              }
+            />
+            <Route
+              path="/services"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isAdmin ? <ServicesAdmin />
                 : <Navigate to="/" replace />
               }
             />

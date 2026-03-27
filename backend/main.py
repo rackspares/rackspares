@@ -14,6 +14,7 @@ from routers.boms import router as boms_router
 from routers.netbox import router as netbox_router
 from routers.optics import router as optics_router
 from routers.preferences import router as preferences_router
+from routers.services import router as services_router
 from routers.auth import hash_password
 
 DEFAULT_CATEGORIES = [
@@ -287,6 +288,32 @@ def run_migrations():
             """))
             print("[rackspares] migration: created company_settings table")
 
+        # ── v0.5.1: company_settings.setup_wizard_completed ──────────────────
+        if "company_settings" in existing_tables:
+            cs_cols = {c["name"] for c in insp.get_columns("company_settings")}
+            if "setup_wizard_completed" not in cs_cols:
+                conn.execute(text(
+                    "ALTER TABLE company_settings"
+                    " ADD COLUMN setup_wizard_completed BOOLEAN NOT NULL DEFAULT false"
+                ))
+                print("[rackspares] migration: added company_settings.setup_wizard_completed")
+
+        # ── v0.5.1: service_configs ───────────────────────────────────────────
+        if "service_configs" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE service_configs (
+                    id SERIAL PRIMARY KEY,
+                    service_name VARCHAR(50) NOT NULL UNIQUE,
+                    url VARCHAR(500),
+                    encrypted_credentials TEXT,
+                    is_connected BOOLEAN NOT NULL DEFAULT false,
+                    last_tested_at TIMESTAMP WITH TIME ZONE,
+                    last_test_status VARCHAR(500),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("[rackspares] migration: created service_configs table")
+
         # ── v0.5.0: inventory_items.serial_number ─────────────────────────────
         if "inventory_items" in existing_tables:
             inv_cols = {c["name"] for c in insp.get_columns("inventory_items")}
@@ -336,7 +363,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RackSpares API",
-    version="0.5.0",
+    version="0.5.1",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -363,8 +390,9 @@ app.include_router(boms_router, prefix="/api/boms", tags=["boms"])
 app.include_router(netbox_router, prefix="/api/netbox", tags=["netbox"])
 app.include_router(optics_router, prefix="/api/optics", tags=["optics"])
 app.include_router(preferences_router, prefix="/api/preferences", tags=["preferences"])
+app.include_router(services_router, prefix="/api/services", tags=["services"])
 
 
 @app.get("/api/health", tags=["health"])
 def health():
-    return {"status": "ok", "version": "0.5.0"}
+    return {"status": "ok", "version": "0.5.1"}

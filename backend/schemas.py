@@ -372,3 +372,19 @@ class UserPreferencesUpdate(BaseModel):
 
 class CompanySettingsOut(BaseModel):
     logo_url: Optional[str] = None
+
+
+# ── Services / Setup Wizard ────────────────────────────────────────────────────
+
+class ServiceConnectRequest(BaseModel):
+    url: str = Field(..., min_length=1, max_length=500)
+    api_key: str = Field(default="", max_length=500)
+
+
+class ServiceStatusItem(BaseModel):
+    status: str                          # not_configured | connected | unreachable
+    url: Optional[str] = None
+    last_tested_at: Optional[datetime] = None
+    last_test_status: Optional[str] = None
+
+    model_config = {"from_attributes": True}

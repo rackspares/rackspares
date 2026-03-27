@@ -239,4 +239,18 @@ class CompanySettings(Base):
 
     id = Column(Integer, primary_key=True)
     logo_filename = Column(String(255), nullable=True)
+    setup_wizard_completed = Column(Boolean, default=False, nullable=False)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ServiceConfig(Base):
+    __tablename__ = "service_configs"
+
+    id = Column(Integer, primary_key=True)
+    service_name = Column(String(50), nullable=False, unique=True)   # netbox | paperless | n8n
+    url = Column(String(500), nullable=True)
+    encrypted_credentials = Column(Text, nullable=True)              # Fernet-encrypted JSON
+    is_connected = Column(Boolean, default=False, nullable=False)
+    last_tested_at = Column(DateTime(timezone=True), nullable=True)
+    last_test_status = Column(String(500), nullable=True)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
