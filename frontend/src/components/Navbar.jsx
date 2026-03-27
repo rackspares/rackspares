@@ -56,7 +56,7 @@ export default function Navbar() {
           }
         </div>
         RackSpares
-        <span className="version-tag">v0.5.0</span>
+        <span className="version-tag">v0.5.1</span>
       </div>
 
       {/* Navigation dropdown */}
@@ -161,6 +161,13 @@ export default function Navbar() {
                   onClick={handleNavLink}
                 >
                   NB Settings
+                </NavLink>
+                <NavLink
+                  to="/services"
+                  className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                  onClick={handleNavLink}
+                >
+                  Services
                 </NavLink>
               </>
             )}
