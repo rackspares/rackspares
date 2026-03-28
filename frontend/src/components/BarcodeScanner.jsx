@@ -99,7 +99,7 @@ async function preprocessForOcr(file) {
  * Uploaded photos are decoded for barcodes first; OCR runs in parallel and the
  * extracted text is passed to onTextFound regardless of whether a barcode was found.
  */
-export default function BarcodeScanner({ onScan, onTextFound, onError }) {
+export default function BarcodeScanner({ onScan, onTextFound, onError, onPhotoPreview }) {
   const videoRef    = useRef(null);
   const streamRef   = useRef(null);
   const controlsRef = useRef(null);
@@ -292,7 +292,13 @@ export default function BarcodeScanner({ onScan, onTextFound, onError }) {
 
   function handleFileChange(e) {
     const file = e.target.files?.[0];
-    if (file) decodeFromFile(file);
+    if (!file) return;
+    // Fire a preview URL immediately — before any processing — so the caller
+    // can show the original photo in the review step as a reference.
+    if (onPhotoPreview) {
+      onPhotoPreview(URL.createObjectURL(file));
+    }
+    decodeFromFile(file);
   }
 
   const uploadLabel = uploadState === 'decoding' ? 'Reading barcode…'

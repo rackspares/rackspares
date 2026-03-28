@@ -107,6 +107,7 @@ class InventoryItem(Base):
     condition = Column(Enum(ItemCondition), default=ItemCondition.new, nullable=False)
     serial_number = Column(String(255), nullable=True, unique=True)
     description = Column(Text)
+    purchase_url = Column(Text, nullable=True)
     site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
     date_added = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     last_updated = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
@@ -114,6 +115,21 @@ class InventoryItem(Base):
 
     category = relationship("Category", foreign_keys=[category_id])
     site = relationship("Site", foreign_keys=[site_id])
+
+
+class ItemPhoto(Base):
+    __tablename__ = "item_photos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    item_id = Column(Integer, ForeignKey("inventory_items.id", ondelete="CASCADE"), nullable=False, index=True)
+    filename = Column(String(255), nullable=False)
+    storage_path = Column(String(512), nullable=False)
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    uploaded_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    label = Column(String(255), nullable=True)
+
+    item = relationship("InventoryItem", foreign_keys=[item_id])
+    uploader = relationship("User", foreign_keys=[uploaded_by])
 
 
 class AuditLog(Base):

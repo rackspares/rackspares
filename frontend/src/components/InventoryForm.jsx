@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api.jsx';
+import CategorySelect from './CategorySelect.jsx';
+import ItemPhotos from './ItemPhotos.jsx';
+import { useAuth } from '../App.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available' },
@@ -20,40 +23,17 @@ const EMPTY = {
   description: '',
   minimum_stock: '',
   lead_time_days: '',
+  purchase_url: '',
   site_id: '',
 };
 
-function buildCategoryTree(flat) {
-  const map = {};
-  flat.forEach((c) => (map[c.id] = { ...c, children: [] }));
-  const roots = [];
-  flat.forEach((c) => {
-    if (c.parent_id && map[c.parent_id]) {
-      map[c.parent_id].children.push(map[c.id]);
-    } else {
-      roots.push(map[c.id]);
-    }
-  });
-  return roots;
-}
 
-function CategoryOptions({ nodes, depth = 0 }) {
-  return nodes.map((node) => (
-    <React.Fragment key={node.id}>
-      <option value={node.id}>{'  '.repeat(depth)}{depth > 0 ? '↳ ' : ''}{node.name}</option>
-      {node.children.length > 0 && (
-        <CategoryOptions nodes={node.children} depth={depth + 1} />
-      )}
-    </React.Fragment>
-  ));
-}
-
-export default function InventoryForm({ item, categories, onSave, onClose, saving }) {
+export default function InventoryForm({ item, onSave, onClose, saving }) {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin' || user?.role === 'manager';
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [sites, setSites] = useState([]);
-
-  const categoryTree = buildCategoryTree(categories || []);
 
   useEffect(() => {
     api.get('/admin/sites/').then((r) => setSites(r.data)).catch(() => {});
@@ -73,6 +53,7 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
         description:    item.description    ?? '',
         minimum_stock:  item.minimum_stock  ?? '',
         lead_time_days: item.lead_time_days ?? '',
+        purchase_url:   item.purchase_url   ?? '',
         site_id:        item.site_id        ?? '',
       });
     } else {
@@ -111,6 +92,7 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
       serial_number:  form.serial_number.trim() || null,
       minimum_stock:  form.minimum_stock !== '' ? Number(form.minimum_stock) : null,
       lead_time_days: form.lead_time_days !== '' ? Number(form.lead_time_days) : null,
+      purchase_url:   form.purchase_url.trim() || null,
       site_id:        form.site_id !== '' ? Number(form.site_id) : null,
     };
     onSave(payload);
@@ -172,14 +154,10 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
               {/* Category */}
               <div className="form-group">
                 <label className="form-label">Category</label>
-                <select
-                  className="form-input"
+                <CategorySelect
                   value={form.category_id}
-                  onChange={(e) => set('category_id', e.target.value)}
-                >
-                  <option value="">— None —</option>
-                  <CategoryOptions nodes={categoryTree} />
-                </select>
+                  onChange={(id) => set('category_id', id)}
+                />
               </div>
 
               {/* Site */}
@@ -291,7 +269,45 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
                   placeholder="Optional notes, part numbers, specs..."
                 />
               </div>
+
+              {/* Purchase / Order URL */}
+              <div className="form-group form-col-span">
+                <label className="form-label">Purchase / Order URL</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    className="form-input"
+                    style={{ flex: 1 }}
+                    type="url"
+                    value={form.purchase_url}
+                    onChange={(e) => set('purchase_url', e.target.value)}
+                    placeholder="https://example.com/product"
+                  />
+                  {form.purchase_url.trim() && (
+                    <a
+                      href={form.purchase_url.trim()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn btn-secondary"
+                      style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+                    >
+                      Open ↗
+                    </a>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Photos section — only shown when editing an existing item */}
+            {item && (
+              <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 16, marginTop: 4 }}>
+                <ItemPhotos
+                  itemId={item.id}
+                  itemType={form.item_type}
+                  hasSerial={!!form.serial_number.trim()}
+                  canEdit={canEdit}
+                />
+              </div>
+            )}
           </div>
 
           <div className="modal-footer">

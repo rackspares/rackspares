@@ -78,14 +78,26 @@ def update_site(
 
 
 @router.delete("/{site_id}", status_code=204)
-def deactivate_site(
+def delete_site(
     site_id: int,
     _: models.User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    """Soft-deactivate a site (never hard-deleted)."""
+    """Hard-delete a site. Blocked if any inventory items are assigned to it."""
     site = db.query(models.Site).filter(models.Site.id == site_id).first()
     if not site:
         raise HTTPException(status_code=404, detail="Site not found")
-    site.active = False
+
+    inventory_count = (
+        db.query(models.InventoryItem)
+        .filter(models.InventoryItem.site_id == site_id)
+        .count()
+    )
+    if inventory_count > 0:
+        raise HTTPException(
+            status_code=409,
+            detail=f"This site has {inventory_count} inventory item(s). Reallocate all inventory before deleting.",
+        )
+
+    db.delete(site)
     db.commit()

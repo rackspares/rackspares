@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../api.jsx';
 import { useAuth, useSiteContext } from '../App.jsx';
 import InventoryForm from '../components/InventoryForm.jsx';
+import ItemDetailPane from '../components/ItemDetailPane.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
 function fmt(dateStr) {
@@ -122,6 +123,7 @@ export default function Inventory() {
   const [statusFilter, setStatus]       = useState('');
   const [staleFilter, setStale]         = useState('');
   const [siteFilter, setSiteFilterLocal] = useState(() => activeSiteId ? String(activeSiteId) : '');
+  const [detailItem, setDetailItem]     = useState(null);
   const [showForm, setShowForm]         = useState(false);
   const [editItem, setEditItem]         = useState(null);
   const [saving, setSaving]             = useState(false);
@@ -335,7 +337,18 @@ export default function Inventory() {
                 {items.map((item) => (
                   <tr key={item.id}>
                     <td>
-                      <div className="col-name">{item.name}</div>
+                      <button
+                        className="col-name item-name-link"
+                        onClick={() => setDetailItem(item)}
+                        style={{
+                          background: 'none', border: 'none', padding: 0,
+                          cursor: 'pointer', textAlign: 'left',
+                          color: 'var(--color-accent)', fontWeight: 600,
+                          fontSize: 'inherit', fontFamily: 'inherit',
+                        }}
+                      >
+                        {item.name}
+                      </button>
                       {item.description && <div className="col-desc">{item.description}</div>}
                     </td>
                     <td>
@@ -398,10 +411,19 @@ export default function Inventory() {
         <div className="table-footer">{items.length} item{items.length !== 1 ? 's' : ''}</div>
       )}
 
+      {detailItem && (
+        <ItemDetailPane
+          item={detailItem}
+          canEdit={canEdit}
+          onClose={() => setDetailItem(null)}
+          onEdit={() => { openEdit(detailItem); setDetailItem(null); }}
+          onDelete={() => { setDeleteTarget(detailItem); setDetailItem(null); }}
+        />
+      )}
+
       {showForm && (
         <InventoryForm
           item={editItem}
-          categories={categories}
           onSave={handleSave}
           onClose={closeForm}
           saving={saving}

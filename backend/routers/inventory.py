@@ -37,6 +37,7 @@ def _item_snapshot(item: models.InventoryItem) -> dict:
         "condition": _serialize(item.condition),
         "serial_number": item.serial_number,
         "description": item.description,
+        "purchase_url": item.purchase_url,
         "last_verified": _serialize(item.last_verified),
     }
 

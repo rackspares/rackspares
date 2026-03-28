@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BarcodeScanner from '../components/BarcodeScanner.jsx';
+import CategorySelect from '../components/CategorySelect.jsx';
 import api from '../api.jsx';
 import { useAuth } from '../App.jsx';
 
@@ -10,6 +11,7 @@ const EMPTY_FORM = {
   quantity: 1,
   location: '',
   description: '',
+  purchase_url: '',
   category_id: '',
   status: 'available',
   condition: 'new',
@@ -17,28 +19,6 @@ const EMPTY_FORM = {
   site_id: '',
 };
 
-function buildCategoryTree(flat) {
-  const map = {};
-  flat.forEach((c) => (map[c.id] = { ...c, children: [] }));
-  const roots = [];
-  flat.forEach((c) => {
-    if (c.parent_id && map[c.parent_id]) {
-      map[c.parent_id].children.push(map[c.id]);
-    } else {
-      roots.push(map[c.id]);
-    }
-  });
-  return roots;
-}
-
-function CategoryOptions({ nodes, depth = 0 }) {
-  return nodes.map((node) => (
-    <React.Fragment key={node.id}>
-      <option value={node.id}>{'  '.repeat(depth)}{depth > 0 ? '↳ ' : ''}{node.name}</option>
-      {node.children.length > 0 && <CategoryOptions nodes={node.children} depth={depth + 1} />}
-    </React.Fragment>
-  ));
-}
 
 function formToPayload(form) {
   return {
@@ -51,6 +31,7 @@ function formToPayload(form) {
     status:        form.status,
     condition:     form.condition,
     item_type:     form.item_type,
+    purchase_url:  form.purchase_url.trim() || null,
     site_id:       form.site_id !== '' ? Number(form.site_id) : null,
   };
 }
@@ -59,11 +40,10 @@ export default function ReceiveShipment() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [mode, setMode] = useState('single');          // 'single' | 'bulk'
-  const [step, setStep] = useState('scan');            // 'scan' | 'review' | 'done'
+  const [step, setStep] = useState('scan');            // 'scan' | 'review' | 'photo' | 'done'
   const [scannedCode, setScannedCode] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [categories, setCategories] = useState([]);
   const [sites, setSites] = useState([]);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -74,9 +54,12 @@ export default function ReceiveShipment() {
   const [manualCode, setManualCode] = useState('');
   const [showManual, setShowManual] = useState(false);
   const [ocrLines, setOcrLines] = useState([]);       // text extracted from uploaded photo
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(null); // object URL of uploaded photo for preview
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const photoInputRef = useRef(null);
 
   useEffect(() => {
-    api.get('/categories/').then((r) => setCategories(r.data)).catch(() => {});
     api.get('/admin/sites/').then((r) => {
       setSites(r.data);
       // Pre-populate site from user's default if set
@@ -85,8 +68,6 @@ export default function ReceiveShipment() {
       }
     }).catch(() => {});
   }, []);
-
-  const categoryTree = buildCategoryTree(categories);
 
   // ── mode switch ────────────────────────────────────────────────────────────
 
@@ -186,7 +167,7 @@ export default function ReceiveShipment() {
 
       const res = await api.post('/inventory/', payload);
       setSavedItem(res.data);
-      setStep('done');
+      setStep('photo');  // offer optional photo before done
     } catch (err) {
       const detail = err.response?.data?.detail;
       if (typeof detail === 'string' && detail.toLowerCase().includes('serial')) {
@@ -234,6 +215,28 @@ export default function ReceiveShipment() {
     }
   }
 
+  // ── receive photo step ─────────────────────────────────────────────────────
+
+  async function handleReceivePhoto(files) {
+    if (!files || files.length === 0 || !savedItem) return;
+    setPhotoError('');
+    setPhotoUploading(true);
+    const kind = savedItem.item_type === 'consumable' ? 'consumables' : 'assets';
+    try {
+      const fd = new FormData();
+      fd.append('file', files[0]);
+      await api.post(`/${kind}/${savedItem.id}/photos`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setStep('done');
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setPhotoError(detail || 'Photo upload failed. Ensure it is JPEG, PNG, or WebP under 10 MB.');
+    } finally {
+      setPhotoUploading(false);
+    }
+  }
+
   // ── reset helpers ──────────────────────────────────────────────────────────
 
   function resetScan() {
@@ -241,6 +244,8 @@ export default function ReceiveShipment() {
     setScannedCode('');
     setLookupResult(null);
     setOcrLines([]);
+    if (photoPreviewUrl) { URL.revokeObjectURL(photoPreviewUrl); }
+    setPhotoPreviewUrl(null);
     setForm({ ...EMPTY_FORM, site_id: user?.site_id ? String(user.site_id) : '' });
     setErrors({});
     setSavedItem(null);
@@ -248,6 +253,8 @@ export default function ReceiveShipment() {
     setScanKey((k) => k + 1);
     setShowManual(false);
     setManualCode('');
+    setPhotoError('');
+    setPhotoUploading(false);
   }
 
   function fullReset() {
@@ -312,7 +319,7 @@ export default function ReceiveShipment() {
       {/* ── STEP: scan ── */}
       {step === 'scan' && (
         <div className="receive-body">
-          <BarcodeScanner key={scanKey} onScan={handleScan} onTextFound={handleTextFound} />
+          <BarcodeScanner key={scanKey} onScan={handleScan} onTextFound={handleTextFound} onPhotoPreview={(url) => setPhotoPreviewUrl(url)} />
           <div className="receive-manual-toggle">
             {showManual ? (
               <form className="receive-manual-form" onSubmit={handleManualSubmit}>
@@ -346,6 +353,20 @@ export default function ReceiveShipment() {
           )}
           {lookupResult?.found === false && (
             <div className="receive-lookup-badge not-found">No product match — enter details below</div>
+          )}
+
+          {photoPreviewUrl && (
+            <div className="photo-preview-panel">
+              <div className="photo-preview-label">Photo reference</div>
+              <a href={photoPreviewUrl} target="_blank" rel="noopener noreferrer" className="photo-preview-link">
+                <img
+                  src={photoPreviewUrl}
+                  alt="Uploaded photo"
+                  className="photo-preview-img"
+                />
+                <span className="photo-preview-expand">&#128269; Tap to enlarge</span>
+              </a>
+            </div>
           )}
 
           {ocrLines.length > 0 && (
@@ -431,14 +452,10 @@ export default function ReceiveShipment() {
 
               <div className="form-group">
                 <label className="form-label">Category</label>
-                <select
-                  className="form-input"
+                <CategorySelect
                   value={form.category_id}
-                  onChange={(e) => set('category_id', e.target.value)}
-                >
-                  <option value="">— None —</option>
-                  <CategoryOptions nodes={categoryTree} />
-                </select>
+                  onChange={(id) => set('category_id', id)}
+                />
               </div>
 
               {sites.length > 0 && (
@@ -490,6 +507,17 @@ export default function ReceiveShipment() {
                   placeholder="Optional notes…"
                 />
               </div>
+
+              <div className="form-group form-col-span">
+                <label className="form-label">Purchase / Order URL</label>
+                <input
+                  className="form-input"
+                  type="url"
+                  value={form.purchase_url}
+                  onChange={(e) => set('purchase_url', e.target.value)}
+                  placeholder="https://example.com/product"
+                />
+              </div>
             </div>
 
             <div className="receive-form-actions">
@@ -503,6 +531,48 @@ export default function ReceiveShipment() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ── STEP: photo (single, optional) ── */}
+      {step === 'photo' && !isBulk && savedItem && (
+        <div className="receive-body receive-done">
+          <div className="receive-done-icon">&#128247;</div>
+          <h2 className="receive-done-title">Add a Photo?</h2>
+          <div className="receive-done-name">{savedItem.name}</div>
+          {savedItem.item_type === 'asset' && !savedItem.serial_number && (
+            <div className="receive-done-note" style={{ color: 'var(--color-text-muted)' }}>
+              No serial number set — photos cannot be attached to assets without a serial number.
+            </div>
+          )}
+          {photoError && (
+            <div className="error-banner" style={{ margin: '8px 0' }}>{photoError}</div>
+          )}
+          {(savedItem.item_type === 'consumable' || savedItem.serial_number) && (
+            <div style={{ margin: '12px 0' }}>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                capture="environment"
+                style={{ display: 'none' }}
+                onChange={(e) => handleReceivePhoto(e.target.files)}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={photoUploading}
+                style={{ marginRight: 8 }}
+              >
+                {photoUploading ? 'Uploading…' : '📷 Take / Choose Photo'}
+              </button>
+            </div>
+          )}
+          <div className="receive-done-actions">
+            <button className="btn btn-secondary" onClick={() => setStep('done')}>
+              Skip
+            </button>
+          </div>
         </div>
       )}
 

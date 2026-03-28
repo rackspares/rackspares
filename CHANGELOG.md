@@ -5,6 +5,56 @@ All notable changes to RackSpares will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-03-28
+
+### Added
+
+#### Dynamic Category Creation During Receiving
+- **Creatable category combobox** in the receiving form and item edit modal — type a new category name and confirm to create it inline without leaving the workflow
+- **"New" badge** displayed next to a freshly created category so users know it was just added
+- Category creation is now available to **Manager** role (previously admin-only) to support the receiving workflow
+- Category POST endpoint is **idempotent** — returns the existing category if the name already exists at the same level instead of erroring
+
+#### Photo Uploads for Consumables (Feature 2)
+- **Consumable photo gallery** — attach one or more photos to any consumable inventory record
+- New `item_photos` database table: id, item_id (FK), filename, storage_path, uploaded_by, uploaded_at, label
+- API endpoints: `POST /api/consumables/{id}/photos`, `GET /api/consumables/{id}/photos`, `DELETE /api/consumables/{id}/photos/{photo_id}`
+- Photos stored on disk under `uploads/consumables/{item_id}/`; served via dedicated file endpoint
+- File type restriction: JPEG, PNG, WebP only — SVG and other types rejected with HTTP 415
+- Per-file size limit: 10 MB
+- **Drag-and-drop upload zone** with `accept="image/*"` and mobile camera capture support
+- **Thumbnail grid** with lightbox on click for full-size view
+- Photo deletion with confirmation prompt; Manager and Admin can delete
+- Photo uploads and deletions logged to the audit log
+
+#### Photo Profiles for Assets (Feature 3)
+- **Asset photo gallery** — attach one or more photos to any serial-number-tracked asset
+- API endpoints: `POST /api/assets/{id}/photos`, `GET /api/assets/{id}/photos`, `DELETE /api/assets/{id}/photos/{photo_id}`
+- Photos stored under `uploads/assets/{asset_id}/`
+- Serial number required before photos can be attached (HTTP 400 if missing)
+- Optional **label/caption** per photo shown beneath thumbnails
+- Same file type, size restrictions, and mobile camera support as consumable photos
+- Photo uploads and deletions logged to the audit log
+
+#### Receiving Workflow Enhancement
+- After receiving a single item, an optional **"Add Photo"** step is offered before the done screen
+- Photo taken during receive is immediately attached to the newly created inventory record
+- Camera capture uses `capture="environment"` (rear camera) on mobile
+
+#### Infrastructure
+- New `item_photos` table via Alembic migration `002`
+- Photo file routes registered under `/api/consumables` and `/api/assets`
+
+### Changed
+- Category creation permission relaxed from Admin-only to Manager+
+- Navbar version tag updated to v0.5.5
+
+### Migration note
+> v0.5.5 adds one new table (`item_photos`). The startup migration is **idempotent** — simply rebuild and restart:
+> ```
+> docker compose up --build -d
+> ```
+
 ## [0.4.0] - 2026-03-26
 
 ### Added

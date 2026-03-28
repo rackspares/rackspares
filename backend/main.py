@@ -20,7 +20,17 @@ from routers.preferences import router as preferences_router
 from routers.services import router as services_router
 from routers.ldap import router as ldap_router
 from routers.sites import router as sites_router
+from routers.photos import consumable_router, asset_router
 from routers.auth import hash_password, limiter
+
+# ── Version ───────────────────────────────────────────────────────────────────
+# Single source of truth for the backend version string.
+# Used by the FastAPI app metadata and the /api/health endpoint.
+#
+# TO BUMP THE VERSION: change APP_VERSION here — that's the only place you
+# need to edit for the backend. Do not hardcode version strings anywhere else.
+# ─────────────────────────────────────────────────────────────────────────────
+APP_VERSION = "0.5.5"
 
 # ── Startup validation ────────────────────────────────────────────────────────
 
@@ -465,7 +475,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RackSpares API",
-    version="0.5.5",
+    version=APP_VERSION,
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -507,8 +517,10 @@ app.include_router(preferences_router, prefix="/api/preferences", tags=["prefere
 app.include_router(services_router, prefix="/api/services", tags=["services"])
 app.include_router(ldap_router, prefix="/api/admin/ldap", tags=["ldap"])
 app.include_router(sites_router, prefix="/api/admin/sites", tags=["sites"])
+app.include_router(consumable_router, prefix="/api/consumables", tags=["consumable-photos"])
+app.include_router(asset_router, prefix="/api/assets", tags=["asset-photos"])
 
 
 @app.get("/api/health", tags=["health"])
 def health():
-    return {"status": "ok", "version": "0.5.5"}
+    return {"status": "ok", "version": APP_VERSION}

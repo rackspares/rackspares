@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 import models
 import schemas
 from database import get_db
-from routers.auth import get_current_user, require_admin
+from routers.auth import get_current_user, require_admin, require_manager_or_admin
 
 router = APIRouter()
 
@@ -23,8 +23,16 @@ def list_categories(
 def create_category(
     payload: schemas.CategoryCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(require_admin),
+    current_user: models.User = Depends(require_manager_or_admin),
 ):
+    # Idempotent: return existing category if name+parent already exists
+    existing = db.query(models.Category).filter(
+        models.Category.name == payload.name,
+        models.Category.parent_id == payload.parent_id,
+    ).first()
+    if existing:
+        return existing
+
     if payload.parent_id:
         parent = db.query(models.Category).filter(models.Category.id == payload.parent_id).first()
         if not parent:

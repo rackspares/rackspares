@@ -157,6 +157,7 @@ class InventoryItemCreate(BaseModel):
     serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
     lead_time_days: Optional[int] = Field(default=None, ge=0)
+    purchase_url: Optional[str] = None
     site_id: Optional[int] = None
 
 
@@ -172,6 +173,7 @@ class InventoryItemUpdate(BaseModel):
     serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
     lead_time_days: Optional[int] = Field(default=None, ge=0)
+    purchase_url: Optional[str] = None
     site_id: Optional[int] = None
 
 
@@ -189,6 +191,7 @@ class InventoryItemOut(BaseModel):
     serial_number: Optional[str] = None
     minimum_stock: Optional[int] = None
     lead_time_days: Optional[int] = None
+    purchase_url: Optional[str] = None
     site_id: Optional[int] = None
     site: Optional[SiteRef] = None
     date_added: datetime
@@ -206,6 +209,20 @@ class BulkReceiveResult(BaseModel):
 class ReorderAlertOut(InventoryItemOut):
     shortfall: int
     urgency: str  # "critical" | "warning"
+
+
+# ── Item Photos ───────────────────────────────────────────────────────────────
+
+class ItemPhotoOut(BaseModel):
+    id: int
+    item_id: int
+    filename: str
+    uploaded_by: Optional[int] = None
+    uploaded_at: datetime
+    label: Optional[str] = None
+    url: str  # injected by the endpoint — not a DB column
+
+    model_config = {"from_attributes": True}
 
 
 # ── Audit ─────────────────────────────────────────────────────────────────────

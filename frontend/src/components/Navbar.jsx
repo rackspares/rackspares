@@ -56,7 +56,7 @@ export default function Navbar() {
           }
         </div>
         RackSpares
-        <span className="version-tag">v0.5.2</span>
+        <span className="version-tag">{import.meta.env.VITE_APP_VERSION ? `v${import.meta.env.VITE_APP_VERSION}` : ''}</span>
       </div>
 
       {/* Navigation dropdown */}

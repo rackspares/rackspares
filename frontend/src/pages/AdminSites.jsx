@@ -85,17 +85,34 @@ function SiteModal({ site, onSave, onClose, saving }) {
   );
 }
 
-function ConfirmDialog({ message, onConfirm, onCancel, busy }) {
+function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel, busy }) {
   return (
     <div className="confirm-overlay">
       <div className="confirm-dialog">
-        <div className="confirm-title">Deactivate site?</div>
+        <div className="confirm-title">{title}</div>
         <div className="confirm-text">{message}</div>
         <div className="confirm-actions">
           <button className="btn btn-secondary" onClick={onCancel} disabled={busy}>Cancel</button>
           <button className="btn btn-danger-outline" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Deactivating...' : 'Deactivate'}
+            {busy ? `${confirmLabel}...` : confirmLabel}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InventoryBlockedDialog({ siteName, itemCount, onClose }) {
+  return (
+    <div className="confirm-overlay">
+      <div className="confirm-dialog">
+        <div className="confirm-title" style={{ color: '#dc2626' }}>Cannot Delete Site</div>
+        <div className="confirm-text">
+          <strong>"{siteName}"</strong> has <strong>{itemCount} inventory item{itemCount !== 1 ? 's' : ''}</strong> assigned to it.
+          Please review and reallocate all inventory before this site can be deleted.
+        </div>
+        <div className="confirm-actions">
+          <button className="btn btn-primary" onClick={onClose}>OK</button>
         </div>
       </div>
     </div>
@@ -110,6 +127,9 @@ export default function AdminSites() {
   const [saving, setSaving]         = useState(false);
   const [deactivateTarget, setDeactivateTarget] = useState(null);
   const [deactivating, setDeactivating]         = useState(false);
+  const [deleteTarget, setDeleteTarget]         = useState(null);
+  const [deleting, setDeleting]                 = useState(false);
+  const [blockedSite, setBlockedSite]           = useState(null); // { name, itemCount }
   const [error, setError]           = useState('');
 
   const load = async () => {
@@ -146,7 +166,7 @@ export default function AdminSites() {
     if (!deactivateTarget) return;
     setDeactivating(true);
     try {
-      await api.delete(`/admin/sites/${deactivateTarget.id}`);
+      await api.put(`/admin/sites/${deactivateTarget.id}`, { active: false });
       setDeactivateTarget(null);
       await load();
     } catch (err) {
@@ -157,12 +177,33 @@ export default function AdminSites() {
     }
   };
 
-  const handleReactivate = async (siteId) => {
+  const handleActivate = async (siteId) => {
     try {
       await api.put(`/admin/sites/${siteId}`, { active: true });
       await load();
     } catch (err) {
-      setError(err.response?.data?.detail || 'Reactivate failed');
+      setError(err.response?.data?.detail || 'Activate failed');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/admin/sites/${deleteTarget.id}`);
+      setDeleteTarget(null);
+      await load();
+    } catch (err) {
+      setDeleteTarget(null);
+      if (err.response?.status === 409) {
+        const detail = err.response.data?.detail || '';
+        const match = detail.match(/(\d+) inventory/);
+        setBlockedSite({ name: deleteTarget.name, itemCount: match ? parseInt(match[1]) : '?' });
+      } else {
+        setError(err.response?.data?.detail || 'Delete failed');
+      }
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -243,18 +284,25 @@ export default function AdminSites() {
                             title="Deactivate"
                             onClick={() => setDeactivateTarget(s)}
                           >
-                            &#128465;
+                            &#9646;&#9646;
                           </button>
                         ) : (
                           <button
                             className="btn-icon"
-                            title="Reactivate"
-                            onClick={() => handleReactivate(s.id)}
+                            title="Activate"
+                            onClick={() => handleActivate(s.id)}
                             style={{ color: '#16a34a' }}
                           >
-                            &#10227;
+                            &#9654;
                           </button>
                         )}
+                        <button
+                          className="btn-icon danger"
+                          title="Delete permanently"
+                          onClick={() => setDeleteTarget(s)}
+                        >
+                          &#128465;
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -278,10 +326,31 @@ export default function AdminSites() {
 
       {deactivateTarget && (
         <ConfirmDialog
-          message={`"${deactivateTarget.name}" will be marked inactive. Existing items keep their site assignment.`}
+          title="Deactivate site?"
+          message={`"${deactivateTarget.name}" will be marked inactive. Existing inventory keeps its site assignment.`}
+          confirmLabel="Deactivate"
           onConfirm={handleDeactivate}
           onCancel={() => setDeactivateTarget(null)}
           busy={deactivating}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete site permanently?"
+          message={`"${deleteTarget.name}" will be permanently removed. This cannot be undone.`}
+          confirmLabel="Delete"
+          onConfirm={handleDelete}
+          onCancel={() => setDeleteTarget(null)}
+          busy={deleting}
+        />
+      )}
+
+      {blockedSite && (
+        <InventoryBlockedDialog
+          siteName={blockedSite.name}
+          itemCount={blockedSite.itemCount}
+          onClose={() => setBlockedSite(null)}
         />
       )}
     </main>
