@@ -19,6 +19,7 @@ from routers.optics import router as optics_router
 from routers.preferences import router as preferences_router
 from routers.services import router as services_router
 from routers.ldap import router as ldap_router
+from routers.sites import router as sites_router
 from routers.auth import hash_password, limiter
 
 # ── Startup validation ────────────────────────────────────────────────────────
@@ -65,9 +66,26 @@ DEFAULT_CATEGORIES = [
 ]
 
 
+def run_alembic_migrations():
+    """Run any pending Alembic migrations (v0.5.5+)."""
+    from alembic.config import Config as AlembicConfig
+    from alembic import command as alembic_command
+
+    cfg = AlembicConfig()
+    cfg.set_main_option(
+        "script_location",
+        os.path.join(os.path.dirname(__file__), "alembic"),
+    )
+    cfg.set_main_option(
+        "sqlalchemy.url",
+        os.getenv("DATABASE_URL", "postgresql://rackspares:rackspares@localhost:5432/rackspares"),
+    )
+    alembic_command.upgrade(cfg, "head")
+
+
 def run_migrations():
     """
-    Idempotent schema migrations for v0.2.0, v0.3.0, and v0.4.0.
+    Idempotent schema migrations for v0.2.0 – v0.5.3.
     Adds new columns/tables to existing database without recreation.
     """
     insp = inspect(engine)
@@ -414,6 +432,7 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
 
     run_migrations()
+    run_alembic_migrations()
 
     db = SessionLocal()
     try:
@@ -446,7 +465,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RackSpares API",
-    version="0.5.3",
+    version="0.5.5",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -487,8 +506,9 @@ app.include_router(optics_router, prefix="/api/optics", tags=["optics"])
 app.include_router(preferences_router, prefix="/api/preferences", tags=["preferences"])
 app.include_router(services_router, prefix="/api/services", tags=["services"])
 app.include_router(ldap_router, prefix="/api/admin/ldap", tags=["ldap"])
+app.include_router(sites_router, prefix="/api/admin/sites", tags=["sites"])
 
 
 @app.get("/api/health", tags=["health"])
 def health():
-    return {"status": "ok", "version": "0.5.3"}
+    return {"status": "ok", "version": "0.5.5"}

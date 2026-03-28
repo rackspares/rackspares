@@ -27,6 +27,7 @@ def _item_snapshot(item: models.InventoryItem) -> dict:
     return {
         "name": item.name,
         "category_id": item.category_id,
+        "site_id": item.site_id,
         "item_type": _serialize(item.item_type),
         "quantity": item.quantity,
         "minimum_stock": item.minimum_stock,
@@ -79,6 +80,7 @@ def list_items(
     item_type: Optional[schemas.ItemType] = Query(default=None),
     status: Optional[schemas.ItemStatus] = Query(default=None),
     stale: Optional[str] = Query(default=None, pattern="^(any|amber|red)$"),
+    site_id: Optional[int] = Query(default=None),
     db: Session = Depends(get_db),
     _: models.User = Depends(get_current_user),
 ):
@@ -110,6 +112,8 @@ def list_items(
                 models.InventoryItem.last_verified < cutoff,
             )
         )
+    if site_id is not None:
+        q = q.filter(models.InventoryItem.site_id == site_id)
 
     return q.order_by(models.InventoryItem.date_added.desc()).all()
 
@@ -202,7 +206,10 @@ def create_item(
                 detail=f"Serial number '{item.serial_number}' is already assigned to '{conflict.name}'",
             )
 
-    db_item = models.InventoryItem(**item.model_dump())
+    data = item.model_dump()
+    if data.get("site_id") is None and current_user.site_id is not None:
+        data["site_id"] = current_user.site_id
+    db_item = models.InventoryItem(**data)
     db.add(db_item)
     db.flush()
     _write_audit(db, current_user, models.AuditAction.create, db_item, _item_snapshot(db_item))
@@ -243,7 +250,10 @@ def bulk_receive(
                 saved.append(existing)
                 continue
 
-        db_item = models.InventoryItem(**item.model_dump())
+        data = item.model_dump()
+        if data.get("site_id") is None and current_user.site_id is not None:
+            data["site_id"] = current_user.site_id
+        db_item = models.InventoryItem(**data)
         db.add(db_item)
         db.flush()
         _write_audit(db, current_user, models.AuditAction.create, db_item, _item_snapshot(db_item))

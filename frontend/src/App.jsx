@@ -20,9 +20,11 @@ import UserPreferences from './pages/UserPreferences.jsx';
 import ReceiveShipment from './pages/ReceiveShipment.jsx';
 import ServicesAdmin from './pages/ServicesAdmin.jsx';
 import LDAPSettings from './pages/LDAPSettings.jsx';
+import AdminSites from './pages/AdminSites.jsx';
 
 export const AuthContext = createContext(null);
 export const ThemeContext = createContext({ theme: 'dark', accent: '#2563eb', setTheme: () => {}, setAccent: () => {} });
+export const SiteContext = createContext({ activeSiteId: null, setActiveSiteId: () => {} });
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -30,6 +32,10 @@ export function useAuth() {
 
 export function useTheme() {
   return useContext(ThemeContext);
+}
+
+export function useSiteContext() {
+  return useContext(SiteContext);
 }
 
 function applyTheme(theme, accent) {
@@ -48,6 +54,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [theme, setThemeState] = useState(() => localStorage.getItem('rs-theme') || 'dark');
   const [accent, setAccentState] = useState(() => localStorage.getItem('rs-accent') || '#2563eb');
+  const [activeSiteId, setActiveSiteId] = useState(null);
 
   // Apply theme immediately on mount and on changes
   useEffect(() => {
@@ -95,6 +102,7 @@ export default function App() {
   return (
     <AuthContext.Provider value={{ user, setUser }}>
       <ThemeContext.Provider value={{ theme, accent, setTheme, setAccent }}>
+      <SiteContext.Provider value={{ activeSiteId, setActiveSiteId }}>
         <BrowserRouter>
           {user && <Navbar />}
           {user && <AdminTicker />}
@@ -203,9 +211,18 @@ export default function App() {
                 : <Navigate to="/" replace />
               }
             />
+            <Route
+              path="/sites"
+              element={
+                !user ? <Navigate to="/login" replace />
+                : isAdmin ? <AdminSites />
+                : <Navigate to="/" replace />
+              }
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
+      </SiteContext.Provider>
       </ThemeContext.Provider>
     </AuthContext.Provider>
   );

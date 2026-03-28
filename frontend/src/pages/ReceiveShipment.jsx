@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BarcodeScanner from '../components/BarcodeScanner.jsx';
 import api from '../api.jsx';
+import { useAuth } from '../App.jsx';
 
 const EMPTY_FORM = {
   name: '',
@@ -13,6 +14,7 @@ const EMPTY_FORM = {
   status: 'available',
   condition: 'new',
   item_type: 'asset',
+  site_id: '',
 };
 
 function buildCategoryTree(flat) {
@@ -49,17 +51,20 @@ function formToPayload(form) {
     status:        form.status,
     condition:     form.condition,
     item_type:     form.item_type,
+    site_id:       form.site_id !== '' ? Number(form.site_id) : null,
   };
 }
 
 export default function ReceiveShipment() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [mode, setMode] = useState('single');          // 'single' | 'bulk'
   const [step, setStep] = useState('scan');            // 'scan' | 'review' | 'done'
   const [scannedCode, setScannedCode] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [categories, setCategories] = useState([]);
+  const [sites, setSites] = useState([]);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [savedItem, setSavedItem] = useState(null);    // single mode done
@@ -72,6 +77,13 @@ export default function ReceiveShipment() {
 
   useEffect(() => {
     api.get('/categories/').then((r) => setCategories(r.data)).catch(() => {});
+    api.get('/admin/sites/').then((r) => {
+      setSites(r.data);
+      // Pre-populate site from user's default if set
+      if (user?.site_id) {
+        setForm((f) => ({ ...f, site_id: String(user.site_id) }));
+      }
+    }).catch(() => {});
   }, []);
 
   const categoryTree = buildCategoryTree(categories);
@@ -229,7 +241,7 @@ export default function ReceiveShipment() {
     setScannedCode('');
     setLookupResult(null);
     setOcrLines([]);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, site_id: user?.site_id ? String(user.site_id) : '' });
     setErrors({});
     setSavedItem(null);
     setBulkResult(null);
@@ -428,6 +440,22 @@ export default function ReceiveShipment() {
                   <CategoryOptions nodes={categoryTree} />
                 </select>
               </div>
+
+              {sites.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Site</label>
+                  <select
+                    className="form-input"
+                    value={form.site_id}
+                    onChange={(e) => set('site_id', e.target.value)}
+                  >
+                    <option value="">— None —</option>
+                    {sites.filter((s) => s.active || String(s.id) === form.site_id).map((s) => (
+                      <option key={s.id} value={s.id}>{s.short_code} — {s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="form-group">
                 <label className="form-label">Type</label>

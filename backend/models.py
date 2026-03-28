@@ -56,6 +56,17 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+class Site(Base):
+    __tablename__ = "sites"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    short_code = Column(String(20), unique=True, nullable=False)
+    address = Column(Text, nullable=True)
+    active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -65,7 +76,10 @@ class User(Base):
     role = Column(Enum(UserRole), default=UserRole.viewer, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     auth_type = Column(Enum(AuthType), default=AuthType.local, nullable=False)
+    site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
+
+    site = relationship("Site", foreign_keys=[site_id])
 
 
 class Category(Base):
@@ -93,11 +107,13 @@ class InventoryItem(Base):
     condition = Column(Enum(ItemCondition), default=ItemCondition.new, nullable=False)
     serial_number = Column(String(255), nullable=True, unique=True)
     description = Column(Text)
+    site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), nullable=True)
     date_added = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     last_updated = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
     last_verified = Column(DateTime(timezone=True), nullable=True)
 
     category = relationship("Category", foreign_keys=[category_id])
+    site = relationship("Site", foreign_keys=[site_id])
 
 
 class AuditLog(Base):

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api.jsx';
-import { useAuth } from '../App.jsx';
+import { useAuth, useSiteContext } from '../App.jsx';
 import InventoryForm from '../components/InventoryForm.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
@@ -108,17 +108,20 @@ function CategoryOptions({ nodes, depth = 0 }) {
 
 export default function Inventory() {
   const { user } = useAuth();
+  const { activeSiteId, setActiveSiteId } = useSiteContext();
   const role = user?.role;
   const canEdit = role === 'admin' || role === 'manager';
 
   const [items, setItems]               = useState([]);
   const [categories, setCategories]     = useState([]);
+  const [sites, setSites]               = useState([]);
   const [fetching, setFetching]         = useState(true);
   const [search, setSearch]             = useState('');
   const [categoryFilter, setCategory]   = useState('');
   const [itemTypeFilter, setItemType]   = useState('');
   const [statusFilter, setStatus]       = useState('');
   const [staleFilter, setStale]         = useState('');
+  const [siteFilter, setSiteFilterLocal] = useState(() => activeSiteId ? String(activeSiteId) : '');
   const [showForm, setShowForm]         = useState(false);
   const [editItem, setEditItem]         = useState(null);
   const [saving, setSaving]             = useState(false);
@@ -126,8 +129,15 @@ export default function Inventory() {
   const [deleting, setDeleting]         = useState(false);
   const [verifying, setVerifying]       = useState(null);
 
+  // Keep SiteContext in sync when the local filter changes
+  const setSiteFilter = (val) => {
+    setSiteFilterLocal(val);
+    setActiveSiteId(val ? Number(val) : null);
+  };
+
   useEffect(() => {
     api.get('/categories/').then((res) => setCategories(res.data)).catch(() => {});
+    api.get('/admin/sites/').then((res) => setSites(res.data)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -143,6 +153,7 @@ export default function Inventory() {
         if (itemTypeFilter) params.item_type   = itemTypeFilter;
         if (statusFilter)   params.status      = statusFilter;
         if (staleFilter)    params.stale       = staleFilter;
+        if (siteFilter)     params.site_id     = siteFilter;
         const res = await api.get('/inventory/', { params });
         if (!cancelled) setItems(res.data);
       } catch (err) {
@@ -153,7 +164,7 @@ export default function Inventory() {
     }, delay);
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [search, categoryFilter, itemTypeFilter, statusFilter, staleFilter]);
+  }, [search, categoryFilter, itemTypeFilter, statusFilter, staleFilter, siteFilter]);
 
   const refresh = () => setSearch((s) => s);
 
@@ -205,7 +216,7 @@ export default function Inventory() {
   const openEdit = (item) => { setEditItem(item); setShowForm(true); };
   const closeForm = () => { setShowForm(false); setEditItem(null); };
 
-  const isFiltered = search || categoryFilter || itemTypeFilter || statusFilter || staleFilter;
+  const isFiltered = search || categoryFilter || itemTypeFilter || statusFilter || staleFilter || siteFilter;
 
   const overdueCount = items.filter((i) => staleness(i.last_verified) === 'red').length;
 
@@ -273,9 +284,17 @@ export default function Inventory() {
           <option value="any">Stale (30d+)</option>
           <option value="red">Critical (90d+)</option>
         </select>
+        {sites.length > 0 && (
+          <select className="filter-select" value={siteFilter} onChange={(e) => setSiteFilter(e.target.value)}>
+            <option value="">All Sites</option>
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>{s.short_code} — {s.name}</option>
+            ))}
+          </select>
+        )}
         {isFiltered && (
           <button className="btn btn-secondary" onClick={() => {
-            setSearch(''); setCategory(''); setItemType(''); setStatus(''); setStale('');
+            setSearch(''); setCategory(''); setItemType(''); setStatus(''); setStale(''); setSiteFilter('');
           }}>
             Clear
           </button>
@@ -303,6 +322,7 @@ export default function Inventory() {
                   <th>Type</th>
                   <th>Condition</th>
                   <th>Category</th>
+                  <th>Site</th>
                   <th>Qty</th>
                   <th>Location</th>
                   <th>Status</th>
@@ -329,6 +349,11 @@ export default function Inventory() {
                       </span>
                     </td>
                     <td className="col-location">{item.category?.name || '—'}</td>
+                    <td className="col-location">
+                      {item.site
+                        ? <span style={{ fontSize: 12, fontWeight: 600, opacity: 0.85 }}>{item.site.short_code}</span>
+                        : '—'}
+                    </td>
                     <td>
                       <span className={`qty${item.quantity === 0 ? ' zero' : item.quantity < 3 ? ' low' : ''}`}>
                         {item.quantity}

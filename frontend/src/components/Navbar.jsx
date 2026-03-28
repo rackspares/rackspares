@@ -176,6 +176,13 @@ export default function Navbar() {
                 >
                   LDAP / AD
                 </NavLink>
+                <NavLink
+                  to="/sites"
+                  className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                  onClick={handleNavLink}
+                >
+                  Sites
+                </NavLink>
               </>
             )}
           </div>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import api from '../api.jsx';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available' },
@@ -19,6 +20,7 @@ const EMPTY = {
   description: '',
   minimum_stock: '',
   lead_time_days: '',
+  site_id: '',
 };
 
 function buildCategoryTree(flat) {
@@ -49,8 +51,13 @@ function CategoryOptions({ nodes, depth = 0 }) {
 export default function InventoryForm({ item, categories, onSave, onClose, saving }) {
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
+  const [sites, setSites] = useState([]);
 
   const categoryTree = buildCategoryTree(categories || []);
+
+  useEffect(() => {
+    api.get('/admin/sites/').then((r) => setSites(r.data)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (item) {
@@ -66,6 +73,7 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
         description:    item.description    ?? '',
         minimum_stock:  item.minimum_stock  ?? '',
         lead_time_days: item.lead_time_days ?? '',
+        site_id:        item.site_id        ?? '',
       });
     } else {
       setForm(EMPTY);
@@ -103,6 +111,7 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
       serial_number:  form.serial_number.trim() || null,
       minimum_stock:  form.minimum_stock !== '' ? Number(form.minimum_stock) : null,
       lead_time_days: form.lead_time_days !== '' ? Number(form.lead_time_days) : null,
+      site_id:        form.site_id !== '' ? Number(form.site_id) : null,
     };
     onSave(payload);
   };
@@ -172,6 +181,23 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
                   <CategoryOptions nodes={categoryTree} />
                 </select>
               </div>
+
+              {/* Site */}
+              {sites.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Site</label>
+                  <select
+                    className="form-input"
+                    value={form.site_id}
+                    onChange={(e) => set('site_id', e.target.value)}
+                  >
+                    <option value="">— None —</option>
+                    {sites.filter((s) => s.active || s.id === form.site_id).map((s) => (
+                      <option key={s.id} value={s.id}>{s.short_code} — {s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Quantity */}
               <div className="form-group">

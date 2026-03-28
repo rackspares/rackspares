@@ -4,12 +4,12 @@ import { useAuth } from '../App.jsx';
 
 const ROLES = ['admin', 'manager', 'viewer'];
 
-const EMPTY_CREATE = { username: '', password: '', role: 'viewer' };
-const EMPTY_EDIT   = { role: 'viewer', password: '', is_active: true };
+const EMPTY_CREATE = { username: '', password: '', role: 'viewer', site_id: '' };
+const EMPTY_EDIT   = { role: 'viewer', password: '', is_active: true, site_id: '' };
 
-function UserModal({ user, onSave, onClose, saving }) {
+function UserModal({ user, sites, onSave, onClose, saving }) {
   const isEdit = !!user;
-  const [form, setForm]   = useState(isEdit ? { role: user.role, password: '', is_active: user.is_active } : EMPTY_CREATE);
+  const [form, setForm]   = useState(isEdit ? { role: user.role, password: '', is_active: user.is_active, site_id: user.site_id ?? '' } : EMPTY_CREATE);
   const [error, setError] = useState('');
 
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
@@ -19,13 +19,20 @@ function UserModal({ user, onSave, onClose, saving }) {
     setError('');
     try {
       if (isEdit) {
-        const payload = { role: form.role, is_active: form.is_active };
+        const payload = {
+          role: form.role,
+          is_active: form.is_active,
+          site_id: form.site_id !== '' ? Number(form.site_id) : null,
+        };
         if (form.password) payload.password = form.password;
         await onSave(user.id, payload);
       } else {
         if (!form.username.trim()) return setError('Username is required');
         if (form.password.length < 6) return setError('Password must be at least 6 characters');
-        await onSave(null, form);
+        await onSave(null, {
+          ...form,
+          site_id: form.site_id !== '' ? Number(form.site_id) : null,
+        });
       }
     } catch (err) {
       setError(err.response?.data?.detail || 'Save failed');
@@ -61,6 +68,17 @@ function UserModal({ user, onSave, onClose, saving }) {
                   {ROLES.map((r) => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
                 </select>
               </div>
+              {sites.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">Default Site</label>
+                  <select className="form-input" value={form.site_id} onChange={(e) => set('site_id', e.target.value)}>
+                    <option value="">— None —</option>
+                    {sites.filter((s) => s.active || s.id === form.site_id).map((s) => (
+                      <option key={s.id} value={s.id}>{s.short_code} — {s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="form-group">
                 <label className="form-label">{isEdit ? 'New Password (leave blank to keep)' : 'Password *'}</label>
                 <input
@@ -101,6 +119,7 @@ function UserModal({ user, onSave, onClose, saving }) {
 export default function UserManagement() {
   const { user: me } = useAuth();
   const [users, setUsers]       = useState([]);
+  const [sites, setSites]       = useState([]);
   const [fetching, setFetching] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser]   = useState(null);
@@ -111,12 +130,14 @@ export default function UserManagement() {
   const load = async () => {
     setFetching(true);
     try {
-      const [usersRes, ldapRes] = await Promise.all([
+      const [usersRes, ldapRes, sitesRes] = await Promise.all([
         api.get('/auth/users'),
         api.get('/admin/ldap').catch(() => ({ data: { enabled: false } })),
+        api.get('/admin/sites/').catch(() => ({ data: [] })),
       ]);
       setUsers(usersRes.data);
       setLdapEnabled(ldapRes.data.enabled ?? false);
+      setSites(sitesRes.data);
     } catch (err) {
       setError('Failed to load users');
     } finally {
@@ -180,6 +201,7 @@ export default function UserManagement() {
                   <th>Username</th>
                   <th>Role</th>
                   <th>Auth</th>
+                  <th>Site</th>
                   <th>Status</th>
                   <th>Created</th>
                   <th></th>
@@ -221,6 +243,11 @@ export default function UserManagement() {
                         {u.auth_type === 'ldap' ? 'LDAP' : 'LOCAL'}
                       </span>
                     </td>
+                    <td className="col-location">
+                      {u.site_id
+                        ? (() => { const s = sites.find((x) => x.id === u.site_id); return s ? s.short_code : '—'; })()
+                        : '—'}
+                    </td>
                     <td>
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -257,6 +284,7 @@ export default function UserManagement() {
       {showModal && (
         <UserModal
           user={editUser}
+          sites={sites}
           onSave={handleSave}
           onClose={closeModal}
           saving={saving}

@@ -239,6 +239,8 @@ def update_user(
         user.hashed_password = hash_password(payload.password)
     if payload.is_active is not None:
         user.is_active = payload.is_active
+    if "site_id" in payload.model_fields_set:
+        user.site_id = payload.site_id
 
     db.commit()
     db.refresh(user)

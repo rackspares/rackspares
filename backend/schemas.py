@@ -44,6 +44,40 @@ class BOMStatus(str, Enum):
     fulfilled = "fulfilled"
 
 
+# ── Sites ─────────────────────────────────────────────────────────────────────
+
+class SiteRef(BaseModel):
+    id: int
+    name: str
+    short_code: str
+
+    model_config = {"from_attributes": True}
+
+
+class SiteOut(BaseModel):
+    id: int
+    name: str
+    short_code: str
+    address: Optional[str] = None
+    active: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class SiteCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    short_code: str = Field(..., min_length=1, max_length=20)
+    address: Optional[str] = None
+
+
+class SiteUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    short_code: Optional[str] = Field(default=None, min_length=1, max_length=20)
+    address: Optional[str] = None
+    active: Optional[bool] = None
+
+
 # ── Auth / Users ───────────────────────────────────────────────────────────────
 
 class Token(BaseModel):
@@ -57,6 +91,7 @@ class UserOut(BaseModel):
     role: UserRole
     is_active: bool
     auth_type: AuthType = AuthType.local
+    site_id: Optional[int] = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -72,6 +107,7 @@ class UserUpdate(BaseModel):
     role: Optional[UserRole] = None
     password: Optional[str] = Field(default=None, min_length=6)
     is_active: Optional[bool] = None
+    site_id: Optional[int] = None
 
 
 class PasswordChange(BaseModel):
@@ -121,6 +157,7 @@ class InventoryItemCreate(BaseModel):
     serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
     lead_time_days: Optional[int] = Field(default=None, ge=0)
+    site_id: Optional[int] = None
 
 
 class InventoryItemUpdate(BaseModel):
@@ -135,6 +172,7 @@ class InventoryItemUpdate(BaseModel):
     serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
     lead_time_days: Optional[int] = Field(default=None, ge=0)
+    site_id: Optional[int] = None
 
 
 class InventoryItemOut(BaseModel):
@@ -151,6 +189,8 @@ class InventoryItemOut(BaseModel):
     serial_number: Optional[str] = None
     minimum_stock: Optional[int] = None
     lead_time_days: Optional[int] = None
+    site_id: Optional[int] = None
+    site: Optional[SiteRef] = None
     date_added: datetime
     last_updated: datetime
     last_verified: Optional[datetime]

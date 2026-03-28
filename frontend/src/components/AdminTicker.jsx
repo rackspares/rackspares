@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../api.jsx';
-import { useAuth } from '../App.jsx';
+import { useAuth, useSiteContext } from '../App.jsx';
 
 function staleness(lastVerified) {
   if (!lastVerified) return true;
@@ -10,6 +10,7 @@ function staleness(lastVerified) {
 
 export default function AdminTicker() {
   const { user } = useAuth();
+  const { activeSiteId } = useSiteContext();
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
@@ -19,8 +20,9 @@ export default function AdminTicker() {
 
     async function load() {
       try {
+        const params = activeSiteId ? { site_id: activeSiteId } : {};
         const [invRes, reorderRes] = await Promise.all([
-          api.get('/inventory/'),
+          api.get('/inventory/', { params }),
           api.get('/inventory/reorder'),
         ]);
         if (cancelled) return;
@@ -52,7 +54,7 @@ export default function AdminTicker() {
     // Refresh every 5 minutes
     const interval = setInterval(load, 5 * 60 * 1000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [user]);
+  }, [user, activeSiteId]);
 
   if (user?.role !== 'admin' || !stats) return null;
 
