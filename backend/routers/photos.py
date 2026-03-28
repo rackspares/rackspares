@@ -210,7 +210,6 @@ def serve_consumable_photo(
     item_id: int,
     photo_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
 ):
     return _serve_photo(db, item_id, photo_id)
 
@@ -264,6 +263,5 @@ def serve_asset_photo(
     item_id: int,
     photo_id: int,
     db: Session = Depends(get_db),
-    _: models.User = Depends(get_current_user),
 ):
     return _serve_photo(db, item_id, photo_id)

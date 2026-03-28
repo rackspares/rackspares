@@ -167,7 +167,7 @@ export default function CategorySelect({ value, onChange, disabled = false, pare
       {open && (
         <div style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
-          background: 'var(--color-bg-card)', border: '1px solid var(--color-border)',
+          background: 'var(--color-surface)', border: '1px solid var(--color-border)',
           borderRadius: 6, marginTop: 2, boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
           maxHeight: 280, display: 'flex', flexDirection: 'column',
         }}>
@@ -203,7 +203,7 @@ export default function CategorySelect({ value, onChange, disabled = false, pare
                 padding: '7px 12px', cursor: 'pointer', fontSize: 13,
                 color: 'var(--color-text-muted)',
               }}
-              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-hover)'}
+              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-alt)'}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
             >
               — None —
@@ -224,7 +224,7 @@ export default function CategorySelect({ value, onChange, disabled = false, pare
                   alignItems: 'center',
                   gap: 6,
                 }}
-                onMouseEnter={(e) => { if (c.id !== Number(value)) e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+                onMouseEnter={(e) => { if (c.id !== Number(value)) e.currentTarget.style.background = 'var(--color-surface-alt)'; }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = c.id === Number(value) ? 'var(--color-accent-faint)' : 'transparent'; }}
               >
                 {c.depth > 0 && <span style={{ color: 'var(--color-text-muted)', fontSize: 11 }}>↳</span>}
@@ -247,7 +247,7 @@ export default function CategorySelect({ value, onChange, disabled = false, pare
                   fontSize: 13, borderTop: '1px solid var(--color-border)',
                   color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: 6,
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-bg-hover)'}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--color-surface-alt)'}
                 onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
               >
                 <span style={{ fontWeight: 600 }}>+</span>

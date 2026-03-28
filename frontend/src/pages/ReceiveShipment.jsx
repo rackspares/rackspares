@@ -225,9 +225,7 @@ export default function ReceiveShipment() {
     try {
       const fd = new FormData();
       fd.append('file', files[0]);
-      await api.post(`/${kind}/${savedItem.id}/photos`, fd, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+      await api.post(`/${kind}/${savedItem.id}/photos`, fd);
       setStep('done');
     } catch (err) {
       const detail = err.response?.data?.detail;

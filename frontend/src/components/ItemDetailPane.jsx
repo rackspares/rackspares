@@ -58,7 +58,7 @@ export default function ItemDetailPane({ item, onClose, onEdit, onDelete, canEdi
         style={{
           position: 'fixed', top: 0, right: 0, bottom: 0, zIndex: 301,
           width: 'min(480px, 100vw)',
-          background: 'var(--color-bg-card)',
+          background: 'var(--color-surface)',
           borderLeft: '1px solid var(--color-border)',
           boxShadow: '-4px 0 24px rgba(0,0,0,0.25)',
           display: 'flex', flexDirection: 'column',
@@ -71,7 +71,7 @@ export default function ItemDetailPane({ item, onClose, onEdit, onDelete, canEdi
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
           padding: '20px 20px 16px',
           borderBottom: '1px solid var(--color-border)',
-          position: 'sticky', top: 0, background: 'var(--color-bg-card)', zIndex: 1,
+          position: 'sticky', top: 0, background: 'var(--color-surface)', zIndex: 1,
         }}>
           <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
             <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700,
@@ -194,7 +194,7 @@ export default function ItemDetailPane({ item, onClose, onEdit, onDelete, canEdi
             borderTop: '1px solid var(--color-border)',
             display: 'flex', gap: 8,
             position: 'sticky', bottom: 0,
-            background: 'var(--color-bg-card)',
+            background: 'var(--color-surface)',
           }}>
             <button className="btn btn-primary" style={{ flex: 1 }} onClick={onEdit}>
               &#9998; Edit

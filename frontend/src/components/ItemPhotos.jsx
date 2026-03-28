@@ -111,9 +111,7 @@ export default function ItemPhotos({ itemId, itemType, hasSerial, canEdit }) {
       for (const file of Array.from(files)) {
         const fd = new FormData();
         fd.append('file', file);
-        await api.post(apiBase, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        await api.post(apiBase, fd);
       }
       await loadPhotos();
     } catch (err) {
@@ -149,7 +147,7 @@ export default function ItemPhotos({ itemId, itemType, hasSerial, canEdit }) {
   if (itemType === 'asset' && !hasSerial) {
     return (
       <div style={{ marginTop: 20, padding: '12px 16px', borderRadius: 6,
-        background: 'var(--color-bg-hover)', color: 'var(--color-text-muted)',
+        background: 'var(--color-surface-alt)', color: 'var(--color-text-muted)',
         fontSize: 13, textAlign: 'center' }}>
         Set a serial number on this asset to enable photo uploads.
       </div>
@@ -175,7 +173,7 @@ export default function ItemPhotos({ itemId, itemType, hasSerial, canEdit }) {
         }}>
           {photos.map((photo) => (
             <div key={photo.id} style={{ position: 'relative', borderRadius: 6, overflow: 'hidden',
-              aspectRatio: '1', background: 'var(--color-bg-hover)' }}>
+              aspectRatio: '1', background: 'var(--color-surface-alt)' }}>
               <img
                 src={photo.url}
                 alt={photo.label || photo.filename}
