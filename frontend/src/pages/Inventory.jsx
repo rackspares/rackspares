@@ -301,6 +301,7 @@ export default function Inventory() {
                 <tr>
                   <th>Name</th>
                   <th>Type</th>
+                  <th>Condition</th>
                   <th>Category</th>
                   <th>Qty</th>
                   <th>Location</th>
@@ -320,6 +321,11 @@ export default function Inventory() {
                     <td>
                       <span className={`item-type-badge item-type-${item.item_type}`}>
                         {item.item_type === 'consumable' ? 'Consumable' : 'Asset'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`condition-badge condition-${item.condition || 'new'}`}>
+                        {item.condition === 'used' ? 'Used' : 'New'}
                       </span>
                     </td>
                     <td className="col-location">{item.category?.name || '—'}</td>

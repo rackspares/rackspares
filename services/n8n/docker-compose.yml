@@ -28,7 +28,16 @@ services:
       WEBHOOK_URL: http://localhost:5678/
     volumes:
       - rackspares_n8n_data:/home/node/.n8n
+    networks:
+      - default
+      - rackspares
     restart: unless-stopped
 
 volumes:
   rackspares_n8n_data:
+
+networks:
+  default: {}
+  rackspares:
+    external: true
+    name: rackspares_default

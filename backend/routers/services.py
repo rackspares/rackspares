@@ -1,16 +1,12 @@
 """
-Services management router — setup wizard, per-service connect/deploy/test.
+Services management router — per-service connect/test/disconnect.
 """
-import asyncio
 import json
-import os
-import shutil
 from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 import models
@@ -22,23 +18,6 @@ from routers.netbox import _fernet          # reuse existing encryption helper
 router = APIRouter()
 
 VALID_SERVICES = {"netbox", "paperless", "n8n"}
-SERVICES_DIR   = "/services"               # compose files mounted here in container
-
-# Default credentials written to DB when a service is deployed via the wizard
-DEFAULT_DEPLOY_CONFIG = {
-    "netbox": {
-        "url":     "http://localhost:8100",
-        "api_key": "0123456789abcdef0123456789abcdef01234567",
-    },
-    "paperless": {
-        "url":     "http://localhost:8200",
-        "api_key": "",   # user must create an API token via Paperless admin UI
-    },
-    "n8n": {
-        "url":     "http://localhost:5678",
-        "api_key": "",   # API key optional for basic connectivity
-    },
-}
 
 
 # ── Encryption helpers ─────────────────────────────────────────────────────────
@@ -82,25 +61,19 @@ def _get_or_create_service(db: Session, name: str) -> models.ServiceConfig:
     return cfg
 
 
-def _get_or_create_company(db: Session) -> models.CompanySettings:
-    c = db.query(models.CompanySettings).first()
-    if not c:
-        c = models.CompanySettings()
-        db.add(c)
-        db.flush()
-    return c
-
-
 # ── Connection test functions ──────────────────────────────────────────────────
 
 async def _test_netbox(url: str, api_key: str) -> tuple[bool, str]:
     try:
-        header = "Bearer" if api_key.startswith("nbt_") else "Token"
+        headers = {}
+        if api_key:
+            prefix = "Bearer" if api_key.startswith("nbt_") else "Token"
+            headers["Authorization"] = f"{prefix} {api_key}"
         async with httpx.AsyncClient(timeout=8.0, verify=False) as client:
-            resp = await client.get(
-                url.rstrip("/") + "/api/",
-                headers={"Authorization": f"{header} {api_key}"},
-            )
+            resp = await client.get(url.rstrip("/") + "/api/", headers=headers)
+        if not api_key:
+            # No token — any HTTP response means the server is up
+            return True, "Server reachable — configure an API token in NB Settings to enable sync"
         if resp.status_code == 200:
             return True, "Connected successfully"
         return False, f"HTTP {resp.status_code}: unexpected response"
@@ -145,31 +118,6 @@ _TEST_FN = {
     "paperless": _test_paperless,
     "n8n":       _test_n8n,
 }
-
-
-# ── Wizard endpoints ───────────────────────────────────────────────────────────
-
-@router.get("/wizard-status")
-def wizard_status(
-    db: Session = Depends(get_db),
-    _: models.User = Depends(require_admin),
-):
-    """Returns whether the first-run setup wizard has been completed/dismissed."""
-    company = _get_or_create_company(db)
-    db.commit()
-    return {"completed": company.setup_wizard_completed}
-
-
-@router.post("/wizard-complete")
-def wizard_complete(
-    db: Session = Depends(get_db),
-    _: models.User = Depends(require_admin),
-):
-    """Mark the setup wizard as completed so it never auto-shows again."""
-    company = _get_or_create_company(db)
-    company.setup_wizard_completed = True
-    db.commit()
-    return {"ok": True}
 
 
 # ── Service status ─────────────────────────────────────────────────────────────
@@ -259,74 +207,6 @@ async def test_service(
     db.commit()
 
     return {"ok": ok, "message": msg}
-
-
-# ── Deploy ─────────────────────────────────────────────────────────────────────
-
-@router.post("/{name}/deploy")
-async def deploy_service(
-    name: str,
-    db: Session = Depends(get_db),
-    _: models.User = Depends(require_admin),
-):
-    """
-    Run `docker compose up -d` for the named service and stream the output
-    as Server-Sent Events. Saves default connection config before starting.
-
-    Each SSE event is JSON with one of:
-      { "line": "<output text>" }
-      { "done": true, "exit_code": 0 }
-      { "error": "<message>" }
-    """
-    if name not in VALID_SERVICES:
-        raise HTTPException(status_code=404, detail=f"Unknown service: {name}")
-
-    compose_file = os.path.join(SERVICES_DIR, name, "docker-compose.yml")
-    if not os.path.exists(compose_file):
-        raise HTTPException(
-            status_code=500,
-            detail=f"Compose file not found at {compose_file}. Is the services volume mounted?",
-        )
-
-    if not shutil.which("docker"):
-        raise HTTPException(
-            status_code=500,
-            detail="Docker CLI not found in container. Is the backend image built with Docker CLI support?",
-        )
-
-    # Persist default connection config before streaming starts
-    defaults = DEFAULT_DEPLOY_CONFIG[name]
-    cfg = _get_or_create_service(db, name)
-    cfg.url = defaults["url"]
-    cfg.encrypted_credentials = _encrypt_creds({"api_key": defaults.get("api_key", "")})
-    cfg.is_connected = False          # will be updated after auto-test
-    cfg.last_tested_at = None
-    cfg.last_test_status = "Deploying…"
-    db.commit()
-
-    async def generate():
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                "docker", "compose",
-                "-f", compose_file,
-                "up", "-d", "--pull", "always",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            async for raw in proc.stdout:
-                line = raw.decode("utf-8", errors="replace").rstrip()
-                yield f"data: {json.dumps({'line': line})}\n\n"
-
-            rc = await proc.wait()
-            yield f"data: {json.dumps({'done': True, 'exit_code': rc})}\n\n"
-        except Exception as exc:
-            yield f"data: {json.dumps({'error': str(exc)})}\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
 
 
 # ── Disconnect ─────────────────────────────────────────────────────────────────

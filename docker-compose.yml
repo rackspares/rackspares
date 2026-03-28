@@ -1,5 +1,3 @@
-version: '3.8'
-
 # ── Default stack: db + backend + frontend ────────────────────────────────────
 # Usage:
 #   docker compose up -d                          # standard stack
@@ -24,20 +22,17 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql://rackspares:rackspares@db:5432/rackspares
-      SECRET_KEY: changeme-in-production
+      SECRET_KEY: ${SECRET_KEY}
       ADMIN_USERNAME: admin
       ADMIN_PASSWORD: admin
       UPLOAD_DIR: /app/uploads
+      # Comma-separated list of allowed browser origins for CORS.
+      # Add your domain here for production, e.g.: https://rackspares.example.com
+      ALLOWED_ORIGINS: http://localhost:3000
     ports:
       - "8000:8000"
     volumes:
       - uploads_data:/app/uploads
-      # Mount compose files so the backend can deploy optional services via the wizard
-      - ./services:/services:ro
-      # Docker socket — required for `docker compose up` in the Setup Wizard.
-      # This grants the backend container access to the host Docker daemon.
-      # Remove this mount if you do not need the wizard's "Spin one up" feature.
-      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       db:
         condition: service_healthy

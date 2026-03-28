@@ -106,12 +106,17 @@ export default function UserManagement() {
   const [editUser, setEditUser]   = useState(null);
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
+  const [ldapEnabled, setLdapEnabled] = useState(false);
 
   const load = async () => {
     setFetching(true);
     try {
-      const res = await api.get('/auth/users');
-      setUsers(res.data);
+      const [usersRes, ldapRes] = await Promise.all([
+        api.get('/auth/users'),
+        api.get('/admin/ldap').catch(() => ({ data: { enabled: false } })),
+      ]);
+      setUsers(usersRes.data);
+      setLdapEnabled(ldapRes.data.enabled ?? false);
     } catch (err) {
       setError('Failed to load users');
     } finally {
@@ -153,6 +158,15 @@ export default function UserManagement() {
         <button className="btn btn-primary" onClick={openCreate}>+ Add User</button>
       </div>
 
+      {ldapEnabled && (
+        <div style={{
+          padding: '10px 16px', borderRadius: 8, marginBottom: 16,
+          background: '#2563eb18', color: '#2563eb', fontSize: 13,
+        }}>
+          LDAP is active. New users are auto-provisioned on first domain login as Viewer.
+        </div>
+      )}
+
       {error && <div className="error-banner">{error}</div>}
 
       <div className="card">
@@ -165,6 +179,7 @@ export default function UserManagement() {
                 <tr>
                   <th>Username</th>
                   <th>Role</th>
+                  <th>Auth</th>
                   <th>Status</th>
                   <th>Created</th>
                   <th></th>
@@ -190,6 +205,20 @@ export default function UserManagement() {
                         color: ROLE_COLORS[u.role],
                       }}>
                         {u.role}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: 12,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        letterSpacing: '0.05em',
+                        background: u.auth_type === 'ldap' ? '#7c3aed20' : '#64748b20',
+                        color: u.auth_type === 'ldap' ? '#7c3aed' : '#64748b',
+                      }}>
+                        {u.auth_type === 'ldap' ? 'LDAP' : 'LOCAL'}
                       </span>
                     </td>
                     <td>

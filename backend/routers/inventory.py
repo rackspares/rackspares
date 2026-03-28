@@ -33,6 +33,7 @@ def _item_snapshot(item: models.InventoryItem) -> dict:
         "lead_time_days": item.lead_time_days,
         "location": item.location,
         "status": _serialize(item.status),
+        "condition": _serialize(item.condition),
         "serial_number": item.serial_number,
         "description": item.description,
         "last_verified": _serialize(item.last_verified),

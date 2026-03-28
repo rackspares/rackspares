@@ -22,6 +22,16 @@ class UserRole(str, Enum):
     viewer = "viewer"
 
 
+class ItemCondition(str, Enum):
+    new = "new"
+    used = "used"
+
+
+class AuthType(str, Enum):
+    local = "local"
+    ldap = "ldap"
+
+
 class AuditAction(str, Enum):
     create = "create"
     update = "update"
@@ -46,6 +56,7 @@ class UserOut(BaseModel):
     username: str
     role: UserRole
     is_active: bool
+    auth_type: AuthType = AuthType.local
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -105,6 +116,7 @@ class InventoryItemCreate(BaseModel):
     quantity: int = Field(default=0, ge=0)
     location: Optional[str] = Field(default=None, max_length=255)
     status: ItemStatus = ItemStatus.available
+    condition: ItemCondition = ItemCondition.new
     description: Optional[str] = None
     serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
@@ -118,6 +130,7 @@ class InventoryItemUpdate(BaseModel):
     quantity: Optional[int] = Field(default=None, ge=0)
     location: Optional[str] = Field(default=None, max_length=255)
     status: Optional[ItemStatus] = None
+    condition: Optional[ItemCondition] = None
     description: Optional[str] = None
     serial_number: Optional[str] = Field(default=None, max_length=255)
     minimum_stock: Optional[int] = Field(default=None, ge=0)
@@ -133,6 +146,7 @@ class InventoryItemOut(BaseModel):
     quantity: int
     location: Optional[str]
     status: ItemStatus
+    condition: ItemCondition = ItemCondition.new
     description: Optional[str]
     serial_number: Optional[str] = None
     minimum_stock: Optional[int] = None
@@ -388,3 +402,35 @@ class ServiceStatusItem(BaseModel):
     last_test_status: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+# ── LDAP ───────────────────────────────────────────────────────────────────────
+
+class LdapConfigOut(BaseModel):
+    id: int
+    server: Optional[str] = None
+    port: int = 636
+    base_dn: Optional[str] = None
+    bind_account: Optional[str] = None
+    bind_password_set: bool = False
+    user_search_filter: str = "(sAMAccountName={username})"
+    use_tls: bool = True
+    enabled: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class LdapConfigUpdate(BaseModel):
+    server: Optional[str] = Field(default=None, max_length=255)
+    port: Optional[int] = Field(default=None, ge=1, le=65535)
+    base_dn: Optional[str] = Field(default=None, max_length=500)
+    bind_account: Optional[str] = Field(default=None, max_length=255)
+    bind_password: Optional[str] = None
+    user_search_filter: Optional[str] = Field(default=None, max_length=500)
+    use_tls: Optional[bool] = None
+
+
+class LdapTestResult(BaseModel):
+    success: bool
+    detail: str
+    users_found: int = 0

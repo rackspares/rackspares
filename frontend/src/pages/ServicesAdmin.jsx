@@ -223,10 +223,9 @@ export default function ServicesAdmin() {
       <div className="services-help">
         <h3>About external services</h3>
         <p>
-          RackSpares integrates with these optional services. Each can be connected
-          to an existing instance or deployed fresh via the{' '}
-          <strong>Setup Wizard</strong> (Admin → re-run wizard). Disconnecting a
-          service only removes the saved credentials — it does not stop any containers.
+          RackSpares integrates with these optional services. Connect to an existing
+          instance by entering its URL and API key. Disconnecting a service only
+          removes the saved credentials — it does not stop any containers.
         </p>
       </div>
     </div>

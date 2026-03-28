@@ -39,6 +39,9 @@ services:
       - "8100:8080"
     volumes:
       - rackspares_netbox_media:/opt/netbox/netbox/media
+    networks:
+      - default
+      - rackspares
     restart: unless-stopped
 
   netbox-worker:
@@ -95,3 +98,9 @@ volumes:
   rackspares_netbox_media:
   rackspares_netbox_pg:
   rackspares_netbox_redis:
+
+networks:
+  default: {}
+  rackspares:
+    external: true
+    name: rackspares_default

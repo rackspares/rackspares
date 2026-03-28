@@ -1,8 +1,11 @@
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import inspect, text
 
 from database import Base, SessionLocal, engine
@@ -15,7 +18,40 @@ from routers.netbox import router as netbox_router
 from routers.optics import router as optics_router
 from routers.preferences import router as preferences_router
 from routers.services import router as services_router
-from routers.auth import hash_password
+from routers.ldap import router as ldap_router
+from routers.auth import hash_password, limiter
+
+# ── Startup validation ────────────────────────────────────────────────────────
+
+_WEAK_KEY_FRAGMENTS = {"secret", "changeme", "default", "password", "rackspares"}
+
+
+def _validate_secret_key() -> None:
+    key = os.getenv("SECRET_KEY", "")
+    if not key:
+        raise RuntimeError(
+            "SECRET_KEY is not set. "
+            "SECRET_KEY must be at least 32 random characters. "
+            "Generate one with: openssl rand -hex 32"
+        )
+    if len(key) < 32:
+        raise RuntimeError(
+            "SECRET_KEY must be at least 32 random characters. "
+            "Generate one with: openssl rand -hex 32"
+        )
+    if any(fragment in key.lower() for fragment in _WEAK_KEY_FRAGMENTS):
+        raise RuntimeError(
+            "SECRET_KEY must be at least 32 random characters. "
+            "Generate one with: openssl rand -hex 32"
+        )
+
+
+_validate_secret_key()
+
+# ── CORS origins ──────────────────────────────────────────────────────────────
+
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 
 DEFAULT_CATEGORIES = [
     ("Servers", None),
@@ -288,15 +324,14 @@ def run_migrations():
             """))
             print("[rackspares] migration: created company_settings table")
 
-        # ── v0.5.1: company_settings.setup_wizard_completed ──────────────────
+        # ── v0.5.3: drop setup_wizard_completed (wizard removed) ─────────────
         if "company_settings" in existing_tables:
             cs_cols = {c["name"] for c in insp.get_columns("company_settings")}
-            if "setup_wizard_completed" not in cs_cols:
+            if "setup_wizard_completed" in cs_cols:
                 conn.execute(text(
-                    "ALTER TABLE company_settings"
-                    " ADD COLUMN setup_wizard_completed BOOLEAN NOT NULL DEFAULT false"
+                    "ALTER TABLE company_settings DROP COLUMN setup_wizard_completed"
                 ))
-                print("[rackspares] migration: added company_settings.setup_wizard_completed")
+                print("[rackspares] migration: dropped company_settings.setup_wizard_completed")
 
         # ── v0.5.1: service_configs ───────────────────────────────────────────
         if "service_configs" not in existing_tables:
@@ -324,13 +359,61 @@ def run_migrations():
                 ))
                 print("[rackspares] migration: added inventory_items.serial_number")
 
+        # ── v0.5.2: inventory_items.condition ─────────────────────────────────
+        if "inventory_items" in existing_tables:
+            inv_cols = {c["name"] for c in insp.get_columns("inventory_items")}
+            if "condition" not in inv_cols:
+                conn.execute(text("""
+                    DO $$ BEGIN
+                        CREATE TYPE itemcondition AS ENUM ('new', 'used');
+                    EXCEPTION WHEN duplicate_object THEN NULL;
+                    END $$;
+                """))
+                conn.execute(text(
+                    "ALTER TABLE inventory_items"
+                    " ADD COLUMN condition itemcondition NOT NULL DEFAULT 'new'"
+                ))
+                print("[rackspares] migration: added inventory_items.condition")
+
+        # ── v0.5.2: users.auth_type ───────────────────────────────────────────
+        if "users" in existing_tables:
+            users_cols = {c["name"] for c in insp.get_columns("users")}
+            if "auth_type" not in users_cols:
+                conn.execute(text("""
+                    DO $$ BEGIN
+                        CREATE TYPE authtype AS ENUM ('local', 'ldap');
+                    EXCEPTION WHEN duplicate_object THEN NULL;
+                    END $$;
+                """))
+                conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN auth_type authtype NOT NULL DEFAULT 'local'"
+                ))
+                print("[rackspares] migration: added users.auth_type")
+
+        # ── v0.5.2: ldap_config ───────────────────────────────────────────────
+        if "ldap_config" not in existing_tables:
+            conn.execute(text("""
+                CREATE TABLE ldap_config (
+                    id SERIAL PRIMARY KEY,
+                    server VARCHAR(255),
+                    port INTEGER NOT NULL DEFAULT 636,
+                    base_dn VARCHAR(500),
+                    bind_account VARCHAR(255),
+                    bind_password_encrypted TEXT,
+                    user_search_filter VARCHAR(500) NOT NULL DEFAULT '(sAMAccountName={username})',
+                    use_tls BOOLEAN NOT NULL DEFAULT true,
+                    enabled BOOLEAN NOT NULL DEFAULT false
+                )
+            """))
+            print("[rackspares] migration: created ldap_config table")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    run_migrations()
-
-    # Create any tables that don't exist yet (safe — skips existing ones)
+    # Create all tables first (safe — skips existing ones); migrations then add missing columns
     Base.metadata.create_all(bind=engine)
+
+    run_migrations()
 
     db = SessionLocal()
     try:
@@ -363,7 +446,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="RackSpares API",
-    version="0.5.1",
+    version="0.5.3",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -374,9 +457,21 @@ app = FastAPI(
     ),
 )
 
+app.state.limiter = limiter
+
+
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Too many login attempts. Try again in 60 seconds."},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -391,8 +486,9 @@ app.include_router(netbox_router, prefix="/api/netbox", tags=["netbox"])
 app.include_router(optics_router, prefix="/api/optics", tags=["optics"])
 app.include_router(preferences_router, prefix="/api/preferences", tags=["preferences"])
 app.include_router(services_router, prefix="/api/services", tags=["services"])
+app.include_router(ldap_router, prefix="/api/admin/ldap", tags=["ldap"])
 
 
 @app.get("/api/health", tags=["health"])
 def health():
-    return {"status": "ok", "version": "0.5.1"}
+    return {"status": "ok", "version": "0.5.3"}

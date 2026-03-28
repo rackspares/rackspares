@@ -97,20 +97,18 @@ def upload_logo(
     _ensure_upload_dir()
 
     # Validate content type
-    allowed = {"image/png", "image/jpeg", "image/gif", "image/svg+xml", "image/webp"}
+    allowed = {"image/jpeg", "image/png", "image/webp"}
     content_type = file.content_type or ""
     if content_type not in allowed:
         raise HTTPException(
-            status_code=400,
-            detail="Logo must be an image (PNG, JPEG, GIF, SVG, WebP)",
+            status_code=415,
+            detail="Logo must be a JPEG, PNG, or WebP image.",
         )
 
     # Determine extension
     ext_map = {
-        "image/png": ".png",
         "image/jpeg": ".jpg",
-        "image/gif": ".gif",
-        "image/svg+xml": ".svg",
+        "image/png": ".png",
         "image/webp": ".webp",
     }
     ext = ext_map.get(content_type, ".png")

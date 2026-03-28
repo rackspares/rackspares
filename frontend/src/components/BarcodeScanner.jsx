@@ -241,7 +241,11 @@ export default function BarcodeScanner({ onScan, onTextFound, onError }) {
       // Pre-process: upscale + grayscale + binarize for much better label OCR
       const processed = await preprocessForOcr(file);
 
-      const worker = await createWorker('eng', 1, { logger: () => {} });
+      const worker = await createWorker('eng', 1, {
+        workerPath: '/tesseract-worker.min.js',
+        corePath: '/tesseract-core-lstm.wasm.js',
+        logger: () => {},
+      });
       // PSM 11 = sparse text (best for hardware labels with mixed layouts)
       await worker.setParameters({ tessedit_pageseg_mode: '11' });
       const { data } = await worker.recognize(processed);
@@ -277,7 +281,8 @@ export default function BarcodeScanner({ onScan, onTextFound, onError }) {
       }
     } catch (err) {
       if (!barcodeFound) {
-        setUploadError(`Could not process image: ${err.message}`);
+        const msg = err?.message || String(err) || 'Unknown error';
+        setUploadError(`Could not process image: ${msg}`);
       }
     } finally {
       setUploadState(null);

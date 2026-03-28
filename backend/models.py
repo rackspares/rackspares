@@ -30,6 +30,16 @@ class UserRole(str, enum.Enum):
     viewer = "viewer"
 
 
+class ItemCondition(str, enum.Enum):
+    new = "new"
+    used = "used"
+
+
+class AuthType(str, enum.Enum):
+    local = "local"
+    ldap = "ldap"
+
+
 class AuditAction(str, enum.Enum):
     create = "create"
     update = "update"
@@ -54,6 +64,7 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     role = Column(Enum(UserRole), default=UserRole.viewer, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    auth_type = Column(Enum(AuthType), default=AuthType.local, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
 
@@ -79,6 +90,7 @@ class InventoryItem(Base):
     lead_time_days = Column(Integer, nullable=True)
     location = Column(String(255))
     status = Column(Enum(ItemStatus), default=ItemStatus.available, nullable=False)
+    condition = Column(Enum(ItemCondition), default=ItemCondition.new, nullable=False)
     serial_number = Column(String(255), nullable=True, unique=True)
     description = Column(Text)
     date_added = Column(DateTime(timezone=True), default=utcnow, nullable=False)
@@ -239,7 +251,6 @@ class CompanySettings(Base):
 
     id = Column(Integer, primary_key=True)
     logo_filename = Column(String(255), nullable=True)
-    setup_wizard_completed = Column(Boolean, default=False, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
@@ -254,3 +265,19 @@ class ServiceConfig(Base):
     last_tested_at = Column(DateTime(timezone=True), nullable=True)
     last_test_status = Column(String(500), nullable=True)
     updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ── LDAP / Active Directory ────────────────────────────────────────────────────
+
+class LdapConfig(Base):
+    __tablename__ = "ldap_config"
+
+    id = Column(Integer, primary_key=True)
+    server = Column(String(255), nullable=True)
+    port = Column(Integer, default=636, nullable=False)
+    base_dn = Column(String(500), nullable=True)
+    bind_account = Column(String(255), nullable=True)
+    bind_password_encrypted = Column(Text, nullable=True)
+    user_search_filter = Column(String(500), default="(sAMAccountName={username})", nullable=False)
+    use_tls = Column(Boolean, default=True, nullable=False)
+    enabled = Column(Boolean, default=False, nullable=False)

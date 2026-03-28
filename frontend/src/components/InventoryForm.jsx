@@ -15,6 +15,7 @@ const EMPTY = {
   quantity: 1,
   location: '',
   status: 'available',
+  condition: 'new',
   description: '',
   minimum_stock: '',
   lead_time_days: '',
@@ -61,6 +62,7 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
         quantity:       item.quantity       ?? 0,
         location:       item.location       ?? '',
         status:         item.status         ?? 'available',
+        condition:      item.condition      ?? 'new',
         description:    item.description    ?? '',
         minimum_stock:  item.minimum_stock  ?? '',
         lead_time_days: item.lead_time_days ?? '',
@@ -206,6 +208,19 @@ export default function InventoryForm({ item, categories, onSave, onClose, savin
                   {STATUS_OPTIONS.map((s) => (
                     <option key={s.value} value={s.value}>{s.label}</option>
                   ))}
+                </select>
+              </div>
+
+              {/* Condition */}
+              <div className="form-group">
+                <label className="form-label">Condition</label>
+                <select
+                  className="form-input"
+                  value={form.condition}
+                  onChange={(e) => set('condition', e.target.value)}
+                >
+                  <option value="new">New</option>
+                  <option value="used">Used</option>
                 </select>
               </div>
 

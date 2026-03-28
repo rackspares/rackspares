@@ -11,6 +11,7 @@ const EMPTY_FORM = {
   description: '',
   category_id: '',
   status: 'available',
+  condition: 'new',
   item_type: 'asset',
 };
 
@@ -46,6 +47,7 @@ function formToPayload(form) {
     description:   form.description.trim() || null,
     category_id:   form.category_id !== '' ? Number(form.category_id) : null,
     status:        form.status,
+    condition:     form.condition,
     item_type:     form.item_type,
   };
 }
@@ -436,6 +438,18 @@ export default function ReceiveShipment() {
                 >
                   <option value="asset">Asset</option>
                   <option value="consumable">Consumable</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Condition</label>
+                <select
+                  className="form-input"
+                  value={form.condition}
+                  onChange={(e) => set('condition', e.target.value)}
+                >
+                  <option value="new">New</option>
+                  <option value="used">Used</option>
                 </select>
               </div>
 

@@ -1112,6 +1112,24 @@ tbody tr:hover td {
 
 .reorder-flag { color: var(--color-danger); font-weight: 700; font-size: 13px; }
 
+/* ── Condition badge ──────────────────────────────────────── */
+.condition-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.01em;
+}
+
+.condition-new   { background: #dcfce7; color: #16a34a; }
+.condition-used  { background: #f1f5f9; color: #475569; }
+
+[data-theme="dark"] .condition-new  { background: rgba(22, 163, 74, 0.2);  color: #4ade80; }
+[data-theme="dark"] .condition-used { background: rgba(71, 85, 105, 0.2);  color: #94a3b8; }
+[data-theme="system"] .condition-new  { background: rgba(22, 163, 74, 0.2);  color: #4ade80; }
+[data-theme="system"] .condition-used { background: rgba(71, 85, 105, 0.2);  color: #94a3b8; }
+
 /* ── Urgency badges (Reorder page) ───────────────────────── */
 .urgency-badge {
   display: inline-block;
@@ -1990,211 +2008,9 @@ tbody tr:hover td {
   color: var(--color-accent);
 }
 
-/* ── Setup Wizard ─────────────────────────────────────────── */
+/* ── Services Admin Dashboard ─────────────────────────────── */
 
-.wizard-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.72);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
-}
-
-.wizard-modal {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  width: 100%;
-  max-width: 660px;
-  display: flex;
-  flex-direction: column;
-  max-height: 90vh;
-  overflow: hidden;
-}
-
-.wizard-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-.wizard-brand {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  flex: 1;
-}
-
-.wizard-steps {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.wizard-step-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--color-surface-2);
-  border: 2px solid var(--color-border);
-  transition: background 0.2s, border-color 0.2s;
-}
-.wizard-step-dot.active {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-.wizard-step-dot.done {
-  background: var(--color-success-text);
-  border-color: var(--color-success-text);
-}
-
-.wizard-dismiss {
-  background: none;
-  border: none;
-  color: var(--color-text-faint);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  line-height: 1;
-}
-.wizard-dismiss:hover { background: var(--color-surface-2); color: var(--color-text); }
-
-.wizard-body {
-  padding: 24px 24px 16px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.wizard-service-intro {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 12px;
-}
-
-.wizard-service-icon { font-size: 36px; line-height: 1; }
-
-.wizard-service-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.wizard-service-tagline {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  margin-top: 2px;
-}
-
-.wizard-step-counter {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--color-text-faint);
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.wizard-service-desc {
-  font-size: 14px;
-  color: var(--color-text-muted);
-  line-height: 1.6;
-  margin: 0 0 20px;
-}
-
-.wizard-choices {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.wizard-choice {
-  background: var(--color-surface-2);
-  border: 2px solid var(--color-border);
-  border-radius: 12px;
-  padding: 16px;
-  cursor: pointer;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: border-color 0.15s, background 0.15s;
-}
-.wizard-choice:hover {
-  border-color: var(--color-accent);
-  background: var(--color-accent-faint);
-}
-.wizard-choice strong {
-  font-size: 14px;
-  color: var(--color-text);
-}
-.wizard-choice span:last-child {
-  font-size: 12px;
-  color: var(--color-text-muted);
-}
-.wizard-choice-icon { font-size: 22px; }
-
-.wizard-form {
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 16px;
-}
-
-.wizard-form-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 14px;
-}
-
-.wizard-deploy { display: flex; flex-direction: column; gap: 12px; }
-
-.wizard-deploy-note {
-  display: flex;
-  gap: 10px;
-  background: var(--color-surface-2);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  font-size: 13px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-.wizard-deploy-note-icon { font-size: 16px; flex-shrink: 0; }
-
-.wizard-deploy-btn { align-self: flex-start; }
-
-.wizard-log {
-  background: #0d1117;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-family: monospace;
-  font-size: 12px;
-  color: #c9d1d9;
-  max-height: 200px;
-  overflow-y: auto;
-  line-height: 1.5;
-}
-
-.wizard-log-line { white-space: pre-wrap; word-break: break-all; }
-
-.wizard-log-placeholder {
-  font-size: 13px;
-  color: var(--color-text-faint);
-  text-align: center;
-  padding: 8px;
-  font-style: italic;
-}
-
+/* Used by the configure modal result display */
 .wizard-result {
   padding: 10px 14px;
   border-radius: 8px;
@@ -2204,23 +2020,6 @@ tbody tr:hover td {
 }
 .wizard-result.ok  { background: var(--color-success-bg);  color: var(--color-success-text); }
 .wizard-result.err { background: var(--color-danger-bg);   color: var(--color-danger); border: 1px solid var(--color-danger-border); }
-
-.wizard-result-note {
-  font-size: 12px;
-  margin-top: 6px;
-  opacity: 0.8;
-}
-
-.wizard-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 24px;
-  border-top: 1px solid var(--color-border);
-  flex-shrink: 0;
-}
-
-/* ── Services Admin Dashboard ─────────────────────────────── */
 
 .services-grid {
   display: grid;

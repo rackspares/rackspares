@@ -56,7 +56,7 @@ export default function Navbar() {
           }
         </div>
         RackSpares
-        <span className="version-tag">v0.5.1</span>
+        <span className="version-tag">v0.5.2</span>
       </div>
 
       {/* Navigation dropdown */}
@@ -168,6 +168,13 @@ export default function Navbar() {
                   onClick={handleNavLink}
                 >
                   Services
+                </NavLink>
+                <NavLink
+                  to="/ldap"
+                  className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
+                  onClick={handleNavLink}
+                >
+                  LDAP / AD
                 </NavLink>
               </>
             )}
